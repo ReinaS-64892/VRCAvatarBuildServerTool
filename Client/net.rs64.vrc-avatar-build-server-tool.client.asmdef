@@ -1,0 +1,25 @@
+{
+  "name": "net.rs64.vrc-avatar-build-server-tool.client",
+  "rootNamespace": "",
+  "references": [
+    "nadena.dev.ndmf",
+    "net.rs64.vrc-avatar-build-server-tool.transfer"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [
+    {
+      "name": "nadena.dev.ndmf",
+      "expression": "1.5.0",
+      "define": "NDMF"
+    }
+  ],
+  "noEngineReferences": false
+}
