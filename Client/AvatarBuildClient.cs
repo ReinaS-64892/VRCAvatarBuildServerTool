@@ -21,8 +21,8 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
         public static async void Do()
         {
             var prefab = Selection.activeGameObject;
-            if (PrefabUtility.IsAnyPrefabInstanceRoot(prefab) is false) { return; }
-            Debug.Log("That is InstanceRoot");
+            // VRCSDK の参照するのをサボっている。
+            if (prefab.GetComponent<Animator>() == null) { return; }
 
             var isAsset = AssetDatabase.Contains(prefab);
             Debug.Log("That Contains-AssetDataBase is" + isAsset);
