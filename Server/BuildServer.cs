@@ -2,14 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using net.rs64.VRCAvatarBuildServerTool.Transfer;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 using VRC.Core;
 using VRC.SDK3A.Editor;
@@ -27,11 +24,14 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             var port = AvatarBuildServerConfiguration.instance.BuildServerReceivePort;
             var mainThreadContext = SynchronizationContext.Current;
 
+            EditorApplication.update += BuilderLoop;
+
             _serverInstance = new(port, mainThreadContext);
         }
         public static void ServerExit()
         {
             if (_serverInstance == null) { Debug.Log("Server is not started"); return; }
+            EditorApplication.update -= BuilderLoop;
             _serverInstance.Dispose(); _serverInstance = null;
         }
         class BuildServerInstance : IDisposable
@@ -80,8 +80,8 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
 
                         ctx.Response.StatusCode = 200;
                         ctx.Response.Close();
-                        
-                        _postCtx.Post(static async byteArray => await GetSDKAndUploadFromTransferred(byteArray as byte[]).ConfigureAwait(false), memStream.ToArray());
+
+                        _postCtx.Post(byteArray => EnQueue(byteArray as byte[]), memStream.ToArray());
                     }
                 }
                 catch (Exception e)
@@ -103,12 +103,38 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             }
         }
 
-
+        static volatile bool s_isTaskDoing;//しぶわいねぇ ... うーん
+        static Queue<byte[]> buildTaskQueue = new();
         const string TemporaryThumbnailGUID = "bf34225cf0fe6be64b94e281fb3a55ce";
-        public static async Task GetSDKAndUploadFromTransferred(byte[] bytes)
+        public static void EnQueue(byte[] bytes)
         {
-            if (VRCSdkControlPanel.TryGetBuilder<IVRCSdkAvatarBuilderApi>(out var sdk) is false) { Debug.Log("filed to get builder "); return; }
-            await UploadFromTransferred(sdk, bytes);
+            lock (buildTaskQueue)
+            {
+                buildTaskQueue.Enqueue(bytes);
+            }
+        }
+        static void BuilderLoop()
+        {
+            if (s_isTaskDoing) { return; }
+            byte[] task;
+            lock (buildTaskQueue) { buildTaskQueue.TryDequeue(out task); }
+
+            if (task is not null) CallAsyncVoid(task);
+
+            static async void CallAsyncVoid(byte[] bytes)
+            {
+                try
+                {
+                    s_isTaskDoing = true;
+                    if (VRCSdkControlPanel.TryGetBuilder(out IVRCSdkAvatarBuilderApi sdk) is false) { Debug.Log("filed to get builder "); return; }
+                    await UploadFromTransferred(sdk, bytes);
+                }
+                catch (Exception e) { Debug.LogException(e); }
+                finally
+                {
+                    s_isTaskDoing = false;
+                }
+            }
         }
 
         static async Task UploadFromTransferred(IVRCSdkAvatarBuilderApi sdk, byte[] bytes)
