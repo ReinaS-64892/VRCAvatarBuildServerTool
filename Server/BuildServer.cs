@@ -77,10 +77,11 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
 
                         var memStream = new MemoryStream((int)req.ContentLength64);
                         await req.InputStream.CopyToAsync(memStream);
-                        _postCtx.Post(static async byteArray => await GetSDKAndUploadFromTransferred(byteArray as byte[]).ConfigureAwait(false), memStream.ToArray());
 
                         ctx.Response.StatusCode = 200;
                         ctx.Response.Close();
+                        
+                        _postCtx.Post(static async byteArray => await GetSDKAndUploadFromTransferred(byteArray as byte[]).ConfigureAwait(false), memStream.ToArray());
                     }
                 }
                 catch (Exception e)
