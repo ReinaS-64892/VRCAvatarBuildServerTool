@@ -58,7 +58,8 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             try
             {
                 _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(5) };
-                var response = await _client.PostAsync(AvatarBuildClientConfiguration.instance.BuildServerURL, new ByteArrayContent(internalBinary)).ConfigureAwait(false);
+                using var binaryContent = new ByteArrayContent(internalBinary);
+                var response = await _client.PostAsync(AvatarBuildClientConfiguration.instance.BuildServerURL, binaryContent).ConfigureAwait(false);
                 Debug.Log("POST Response :" + response.StatusCode);
             }
             catch (Exception e)
