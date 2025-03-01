@@ -18,7 +18,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
 
         [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer")]
         [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer")]
-        public static async Task Do()
+        public static async void Do()
         {
             var prefab = Selection.activeGameObject;
             if (PrefabUtility.IsAnyPrefabInstanceRoot(prefab) is false) { return; }
@@ -58,7 +58,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             try
             {
                 _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(5) };
-                var response = await _client.PostAsync(AvatarBuildClientConfiguration.instance.BuildServerURL, new ByteArrayContent(internalBinary));
+                var response = await _client.PostAsync(AvatarBuildClientConfiguration.instance.BuildServerURL, new ByteArrayContent(internalBinary)).ConfigureAwait(false);
                 Debug.Log("POST Response :" + response.StatusCode);
             }
             catch (Exception e)
