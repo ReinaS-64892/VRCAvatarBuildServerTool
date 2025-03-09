@@ -6,7 +6,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
     [FilePath("ProjectSettings/VRCAvatarBuildServerToolConfiguration.asset", FilePathAttribute.Location.ProjectFolder)]
     internal sealed class AvatarBuildServerConfiguration : ScriptableSingleton<AvatarBuildServerConfiguration>
     {
-        public int BuildServerReceivePort = 8080;
+        public string BuildServerListenAddress = "http://127.0.0.1:8080/";
         public bool ShowGUIToAutoStart = true;
     }
 
@@ -33,7 +33,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             sObj ??= new SerializedObject(AvatarBuildServerConfiguration.instance);
             sObj.Update();
 
-            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.BuildServerReceivePort)));
+            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.BuildServerListenAddress)));
             EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.ShowGUIToAutoStart)));
             if (BuildServer.IsServerStarted is false)
             {
