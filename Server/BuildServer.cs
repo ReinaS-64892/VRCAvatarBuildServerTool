@@ -21,12 +21,12 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
         public static void ServerStart()
         {
             if (_serverInstance != null) { Debug.Log("Server is already started"); return; }
-            var port = AvatarBuildServerConfiguration.instance.BuildServerReceivePort;
+            var address = AvatarBuildServerConfiguration.instance.BuildServerListenAddress;
             var mainThreadContext = SynchronizationContext.Current;
 
             EditorApplication.update += BuilderLoop;
 
-            _serverInstance = new(port, mainThreadContext);
+            _serverInstance = new(address, mainThreadContext);
         }
         public static void ServerExit()
         {
@@ -36,7 +36,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
         }
         class BuildServerInstance : IDisposable
         {
-            int _port;
+            string _address;
             SynchronizationContext _postCtx;
 
             HttpListener _httpListener;
@@ -45,12 +45,12 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
 
             Task _listenTask;
 
-            public BuildServerInstance(int port, SynchronizationContext post)
+            public BuildServerInstance(string address, SynchronizationContext post)
             {
-                _port = port;
+                _address = address;
                 _postCtx = post;
                 _httpListener = new();
-                _httpListener.Prefixes.Add("http://127.0.0.1:" + port + "/");
+                _httpListener.Prefixes.Add(address);
 
                 _serverCancellationTokenSource = new();
 
