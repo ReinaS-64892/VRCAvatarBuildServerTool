@@ -14,7 +14,7 @@ using VRC.SDKBase.Editor.Api;
 
 namespace net.rs64.VRCAvatarBuildServerTool.Server
 {
-    public static class BuildServer
+    public static class AvatarBuildServer
     {
         static BuildServerInstance _serverInstance;
         public static bool IsServerStarted => _serverInstance != null;
@@ -151,15 +151,24 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                 zip.ExtractToDirectory(destPath);
                 AssetDatabase.ImportAsset(destPath, ImportAssetOptions.ImportRecursive);
 
+                var count = guids.Count;
+                var i = 0;
+                EditorUtility.DisplayProgressBar("upload avatar(s)", "", 0.0f);
+
                 foreach (var guid in guids)
                 {
                     await BuildToUploadFromGUID(sdk, guid);
+
+                    i += 1;
+                    EditorUtility.DisplayProgressBar("upload avatar(s)", guid, i / (float)count);
                 }
             }
             finally
             {
                 Directory.Delete(destPath, true);
                 File.Delete(destPath + ".meta");
+
+                EditorUtility.ClearProgressBar();
             }
         }
 
@@ -189,6 +198,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             var thumbnailPath = isNewAvatar ? AssetDatabase.GUIDToAssetPath(TemporaryThumbnailGUID) : null;
 
             await sdk.BuildAndUpload(prefab, vrcAvatar, thumbnailPath);
+            Debug.Log("upload:" + prefab.name);
         }
     }
 }

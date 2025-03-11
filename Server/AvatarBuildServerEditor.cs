@@ -17,7 +17,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
         {
             if (AvatarBuildServerConfiguration.instance.ShowGUIToAutoStart)
             {
-                BuildServer.ServerStart();
+                AvatarBuildServer.ServerStart();
             }
         }
 
@@ -29,18 +29,18 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
 
             EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.BuildServerListenAddress)));
             EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.ShowGUIToAutoStart)));
-            if (BuildServer.IsServerStarted is false)
+            if (AvatarBuildServer.IsServerStarted is false)
             {
                 if (GUILayout.Button("server start"))
                 {
-                    BuildServer.ServerStart();
+                    AvatarBuildServer.ServerStart();
                 }
             }
             else
             {
                 if (GUILayout.Button("exit server"))
                 {
-                    BuildServer.ServerExit();
+                    AvatarBuildServer.ServerExit();
                 }
             }
 
