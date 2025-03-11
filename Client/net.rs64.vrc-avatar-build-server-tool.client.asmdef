@@ -3,7 +3,8 @@
   "rootNamespace": "",
   "references": [
     "nadena.dev.ndmf",
-    "net.rs64.vrc-avatar-build-server-tool.transfer"
+    "net.rs64.vrc-avatar-build-server-tool.transfer",
+    "com.anatawa12.continuous-avatar-uploader.editor"
   ],
   "includePlatforms": [
     "Editor"
@@ -19,6 +20,11 @@
       "name": "nadena.dev.ndmf",
       "expression": "1.5.0",
       "define": "NDMF"
+    },
+    {
+      "name": "com.anatawa12.continuous-avatar-uploader",
+      "expression": "0.3.3",
+      "define": "CAU"
     }
   ],
   "noEngineReferences": false
