@@ -46,7 +46,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                         {
                             var internalBinary = AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, new string[] { targetGUID });
                             EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "POST", 0.95f);
-                            await PostInternalBinary(internalBinary).ConfigureAwait(false);
+                            await PostInternalBinary(internalBinary);
                         }
                         finally
                         {
@@ -73,7 +73,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                         {
                             var internalBinary = AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, targetGUIDs);
                             EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "POST", 0.95f);
-                            await PostInternalBinary(internalBinary).ConfigureAwait(false);
+                            await PostInternalBinary(internalBinary);
                         }
                         finally
                         {
