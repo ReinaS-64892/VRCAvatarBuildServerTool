@@ -134,6 +134,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
         {
             try
             {
+                Debug.Log("internal binary size for:" + internalBinary.LongLength / (1024.0 * 1024.0) + "mb");
                 _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(5) };
                 using var binaryContent = new ByteArrayContent(internalBinary);
                 var response = await _client.PostAsync(AvatarBuildClientConfiguration.instance.BuildServerURL, binaryContent).ConfigureAwait(false);
