@@ -1,15 +1,12 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using net.rs64.VRCAvatarBuildServerTool.Transfer;
 using UnityEditor;
 using UnityEngine;
+
 #if CAU
 using Anatawa12.ContinuousAvatarUploader.Editor;
 #endif
@@ -135,9 +132,18 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             try
             {
                 Debug.Log("internal binary size for:" + internalBinary.LongLength / (1024.0 * 1024.0) + "mb");
-                _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(5) };
+                _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(360)};
                 using var binaryContent = new ByteArrayContent(internalBinary);
-                var response = await _client.PostAsync(AvatarBuildClientConfiguration.instance.BuildServerURL, binaryContent).ConfigureAwait(false);
+
+                // PostAsync を使うとでかいバイナリを投げる時に壊れることがある、しかしなぜ？ 古い API は信用してはならないのかもしれない。
+                // var response = await _client.PostAsync(AvatarBuildClientConfiguration.instance.BuildServerURL, binaryContent);
+
+                using var req = new HttpRequestMessage();
+                req.Content = binaryContent;
+                req.Method = HttpMethod.Post;
+                req.RequestUri = new Uri(AvatarBuildClientConfiguration.instance.BuildServerURL);
+                var response = await _client.SendAsync(req);
+
                 Debug.Log("POST Response :" + response.StatusCode);
             }
             catch (Exception e)
