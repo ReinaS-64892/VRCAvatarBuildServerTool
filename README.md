@@ -64,6 +64,8 @@ __それができないのであれば、このツールを使うに足りうる
 
 基本は `Tools/VRCAvatarBuildServerTool/Server` から window を開き、サーバーが待ち受けるようになります。
 
+- BuildServerListenAddress -> これは待ち受けるアドレスになるので PC 内での転送であればデフォルトのまま `http://127.0.0.1:8080/` (ポートがほかソフトウェアなどと衝突する場合は適宜変更)、LAN 内などで PC をまたぐ場合は `http://192.168.0.5:9503/` のような ローカルIPアドレスで待ち受けるように設定する必要があります。
+
 #### インストールしておくべきパッケージ
 
 ALCOM などを用いて VPM でインストールされているものは同時にいれる必要があります。
@@ -80,7 +82,7 @@ Server側で NDMF を実行する場合は こちらにも使用するパッケ�
 
 `Tools/VRCAvatarBuildServerTool/ClientConfiguration` から クライアントとしての設定項目が表示されます。
 
-- BuildServerURL -> Http POST を送信する URL です。
+- BuildServerURL -> Http POST を送信する URL です。(BuildServerListenAddress と同じであればほとんどの場合問題がないと思われます。)
 - ClientSideNDMFExecution -> クライアント側で NDMF を実行する項目です。 サーバー側で行いたい場合はサーバー側のパッケージを確認した後に外してください。
 
 ## 注意事項
