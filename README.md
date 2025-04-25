@@ -33,6 +33,19 @@ Unity 2022.3.22f1 - Vulkan 環境は私の環境(XWayland + Wayfire + Nvidia RTX
 
 つまり、59 - Vulkan で TexTransTool をビルドし、 22 - OpenGL で VRCSDK のビルドをしてしまえばいいのです！
 
+### 追記
+
+私の環境がそれから `XWayland + Wayfire + Radeon RX 6700XT` になったため、`2022.3.22f1 OpenGL 4.5` で動くかなと思ったのですが、 TTT の取扱に Radeon の OpenGL ComputeShader 実装が耐えられないようでこのツールを捨てることはできなかったようです。(当然 `2022.3.59f1 Vulkan` は正常ビルドが可能ですが、 `XWayland + Randeon GPU` 環境でしか発生しないバグを踏み抜くなどがあり `2022.3.39f1 Vulkan` の環境で私は作業しています。)
+
+私がサーバー側の環境を整えたこともあり、元々使用していた `Nvidia RTX 2060SP` をサーバー側に挿し、そして、手元の環境で TexTransTool のビルドを回避したいがために、 TTCE-Wgpu を使用することで、 TTT を `2022.3.22f1 OpenGL 4.5` の上でゴリ押しでどうさせれるようにしたため、私の環境は現在このようになっています。
+
+| GPU | UnityVersion  | GraphicsAPI | TexTransTool (TTCE-Wgpu) | lilToon | クラッシュ | VRCSDK Build |
+| ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
+| Nvidia RTX 2060SP | 2022.3.22f1  | OpenGL 4.5  | NG (OK) | OK | しない | 可能 |
+| Radeon RX 6700XT | 2022.3.39f1  | Vulkan  | OK (OK) | OK | しない | 不可能 |
+
+ちなみに、このツールはサーバーへのビルド転送の受信を別スレッドで行っているので、 ClientSideNDMFExecution をオフにすれば連続で（サーバー側でビルド中であっても）送れるようになっていて、とってもお得！
+
 ### 技術的な話
 
 Http POST を用いて、ビルド対象と依存関係(Packages 配下のものを除く(一部例外あり))を zip にして サーバーに転送し、 VRCSDK の Public API を用いて受け取った zip からアップロードを行います。
@@ -61,7 +74,7 @@ Server側で NDMF を実行する場合は こちらにも使用するパッケ�
 
 ### Client
 
-アセットとしての Prefab や Scene に存在する VRCSDK がビルド可能な Prefab に対して 右クリックから `VRCAvatarBuildServerTool/BuildToServer` を実行することで、 Server 二ビルドを転送することが可能です。
+アセットとしての Prefab や Scene に存在する VRCSDK がビルド可能な Prefab に対して 右クリックから `VRCAvatarBuildServerTool/BuildToServer` を実行することで、 Server にビルドを転送することが可能です。
 
 #### Client設定
 
