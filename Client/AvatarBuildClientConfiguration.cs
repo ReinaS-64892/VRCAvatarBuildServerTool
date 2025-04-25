@@ -7,7 +7,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
     internal sealed class AvatarBuildClientConfiguration : ScriptableSingleton<AvatarBuildClientConfiguration>
     {
         public string BuildServerURL = "http://127.0.0.1:8080";
-        public bool ClientSideNDMFExecution = true;
+        public bool ClientSideNDMFExecution = false;
         internal void Save()
         {
             Save(true);
