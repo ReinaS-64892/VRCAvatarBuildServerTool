@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 using net.rs64.VRCAvatarBuildServerTool.Transfer;
 using UnityEditor;
 using UnityEngine;
+using System.Diagnostics;
+using Debug = UnityEngine.Debug;
+
+
 
 #if CAU
 using Anatawa12.ContinuousAvatarUploader.Editor;
@@ -34,14 +38,22 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
 
                         var targetPath = CloneAndBuildToAsset(avatarRoot);
 
-                        EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Post data prepare", 0.7f);
+                        EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Post data search", 0.1f);
 
+                        var sw = Stopwatch.StartNew();
                         var targetGUID = AssetDatabase.AssetPathToGUID(targetPath);
                         var transferAssets = GetDependenciesWithFiltered(targetPath);
 
+                        sw.Stop();
+                        Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
+                        EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Post data prepare", 0.2f);
+
                         try
                         {
+                            sw.Restart();
                             var internalBinary = AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, new string[] { targetGUID });
+                            sw.Stop();
+                            Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
                             EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "POST", 0.95f);
                             await PostInternalBinary(internalBinary);
                         }
@@ -64,12 +76,20 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                         var targetPaths = targetAvatarRoots.Select(CloneAndBuildToAsset).ToArray();
 
                         EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Post data prepare", 0.7f);
+                        var sw = Stopwatch.StartNew();
+
                         var targetGUIDs = targetPaths.Select(AssetDatabase.AssetPathToGUID);
                         var transferAssets = GetDependenciesWithFiltered(targetPaths);
+
+                        sw.Stop();
+                        Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
                         try
                         {
+                            sw.Restart();
                             var internalBinary = AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, targetGUIDs);
                             EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "POST", 0.95f);
+                            sw.Stop();
+                            Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
                             await PostInternalBinary(internalBinary);
                         }
                         finally
@@ -132,7 +152,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             try
             {
                 Debug.Log("internal binary size for:" + internalBinary.LongLength / (1024.0 * 1024.0) + "mb");
-                _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(360)};
+                _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(360) };
                 using var binaryContent = new ByteArrayContent(internalBinary);
 
                 // PostAsync を使うとでかいバイナリを投げる時に壊れることがある、しかしなぜ？ 古い API は信用してはならないのかもしれない。
