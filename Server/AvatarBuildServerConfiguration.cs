@@ -2,7 +2,7 @@ using UnityEditor;
 
 namespace net.rs64.VRCAvatarBuildServerTool.Server
 {
-    [FilePath("ProjectSettings/VRCAvatarBuildServerToolConfiguration.asset", FilePathAttribute.Location.PreferencesFolder)]
+    [FilePath("ProjectSettings/VRCAvatarBuildServerToolConfiguration.asset", FilePathAttribute.Location.ProjectFolder)]
     internal sealed class AvatarBuildServerConfiguration : ScriptableSingleton<AvatarBuildServerConfiguration>
     {
         public string BuildServerListenAddress = "http://127.0.0.1:8080/";
