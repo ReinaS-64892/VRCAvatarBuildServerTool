@@ -51,7 +51,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                         try
                         {
                             sw.Restart();
-                            var internalBinary = AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, new string[] { targetGUID });
+                            var internalBinary = await AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, new string[] { targetGUID });
                             sw.Stop();
                             Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
                             EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "POST", 0.95f);

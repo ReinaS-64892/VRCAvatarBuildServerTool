@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
@@ -14,9 +15,9 @@ namespace net.rs64.VRCAvatarBuildServerTool.Transfer
     {
         readonly static byte[] Signature = Encoding.ASCII.GetBytes("net.rs64.vrc-avatar-build-server-tool.internal-binary");
         readonly static uint ProtocolVersion = 0;
-        public static byte[] EncodeAssetsAndTargetGUID(IEnumerable<string> includeAssetsPath, IEnumerable<string> buildTargetGUID)
+        public static Task<byte[]> EncodeAssetsAndTargetGUID(IEnumerable<string> includeAssetsPath, IEnumerable<string> buildTargetGUID)
         {
-            using var outMemStream = new MemoryStream();
+            var outMemStream = new MemoryStream();
 
             outMemStream.Write(Signature);
 
@@ -32,19 +33,34 @@ namespace net.rs64.VRCAvatarBuildServerTool.Transfer
             outMemStream.Write(jsonStrLength);
             outMemStream.Write(jsonBytes);
 
+            return ReadFromFiles(includeAssetsPath, outMemStream);
+        }
+
+        private static async Task<byte[]> ReadFromFiles(IEnumerable<string> includeAssetsPath, MemoryStream ownedWriteTarget)
+        {
+            using var outMemStream = ownedWriteTarget;
+
+            var readTask = includeAssetsPath
+                                .SelectMany(path => new string[] { path, path + ".meta" })
+                                .Where(File.Exists)
+                                .Select(path => (path, File.ReadAllBytesAsync(path)))
+                                .ToArray();
+
             using var memStream = new MemoryStream();
-            using (var zipArchiver = new ZipArchive(memStream, ZipArchiveMode.Create))
-                foreach (var target in includeAssetsPath)
+            using (var zipArchiver = new ZipArchive(memStream, ZipArchiveMode.Create, true))
+                foreach (var readBytesTask in readTask)
                 {
-                    zipArchiver.CreateEntryFromFile(target, target, System.IO.Compression.CompressionLevel.NoCompression);
+                    var entry = zipArchiver.CreateEntry(readBytesTask.path, System.IO.Compression.CompressionLevel.Optimal);
 
-                    var metaPath = AssetDatabase.GetTextMetaFilePathFromAssetPath(target);
-                    zipArchiver.CreateEntryFromFile(metaPath, metaPath, System.IO.Compression.CompressionLevel.NoCompression);
+                    using var entryWriter = entry.Open();
+                    await entryWriter.WriteAsync(await readBytesTask.Item2);
                 }
-            outMemStream.Write(memStream.ToArray());// 直接 ZipArchive outMemStream を食わせてよいのかわかんなかったので暫定的な実装。
 
+            memStream.Seek(0, SeekOrigin.Begin);
+            await memStream.CopyToAsync(outMemStream);// 直接 ZipArchive outMemStream を食わせてよいのかわかんなかったので暫定的な実装。
             return outMemStream.ToArray();
         }
+
         public static (MemoryStream zipStream, List<string> BuildTargetGUID) DecodeAssetsAndTargetGUID(byte[] bytes)
         {
             var i = 0;
