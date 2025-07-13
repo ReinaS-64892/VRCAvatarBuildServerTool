@@ -36,10 +36,10 @@ namespace net.rs64.VRCAvatarBuildServerTool.Transfer
             using (var zipArchiver = new ZipArchive(memStream, ZipArchiveMode.Create))
                 foreach (var target in includeAssetsPath)
                 {
-                    zipArchiver.CreateEntryFromFile(target, target, System.IO.Compression.CompressionLevel.Fastest);
+                    zipArchiver.CreateEntryFromFile(target, target, System.IO.Compression.CompressionLevel.NoCompression);
 
                     var metaPath = AssetDatabase.GetTextMetaFilePathFromAssetPath(target);
-                    zipArchiver.CreateEntryFromFile(metaPath, metaPath, System.IO.Compression.CompressionLevel.Fastest);
+                    zipArchiver.CreateEntryFromFile(metaPath, metaPath, System.IO.Compression.CompressionLevel.NoCompression);
                 }
             outMemStream.Write(memStream.ToArray());// 直接 ZipArchive outMemStream を食わせてよいのかわかんなかったので暫定的な実装。
 
