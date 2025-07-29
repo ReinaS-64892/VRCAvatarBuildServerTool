@@ -24,7 +24,12 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
 
         [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer")]
         [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer")]
-        public static async void Do()
+        public static void Do() { DoImpl(); }
+
+        [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer(ClientSideNDMFExecution)")]
+        [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer(ClientSideNDMFExecution)")]
+        public static void ClientSideNDMFManualBakeToDo() { DoImpl(true); }
+        public static async void DoImpl(bool clientSideNDMFExecution = false)
         {
             switch (Selection.activeObject)
             {
@@ -36,7 +41,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                         if (avatarRoot.GetComponent<Animator>() == null) { return; }
                         EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "CloneAndBuildToAsset", 0f);
 
-                        var targetPath = CloneAndBuildToAsset(avatarRoot);
+                        var targetPath = CloneAndBuildToAsset(avatarRoot, clientSideNDMFExecution);
 
                         EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Post data search", 0.1f);
 
@@ -73,7 +78,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                         var targetAvatarRoots = GetPrefabFromCAU(aus);
 
                         EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "CloneAndBuildToAsset", 0.1f);
-                        var targetPaths = targetAvatarRoots.Select(CloneAndBuildToAsset).ToArray();
+                        var targetPaths = targetAvatarRoots.Select(i => CloneAndBuildToAsset(i, clientSideNDMFExecution)).ToArray();
 
                         EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Post data prepare", 0.7f);
                         var sw = Stopwatch.StartNew();
@@ -188,13 +193,13 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             }
         }
 
-        private static string CloneAndBuildToAsset(GameObject avatarRoot)
+        private static string CloneAndBuildToAsset(GameObject avatarRoot, bool doNDMFManualBake)
         {
             var builded = UnityEngine.Object.Instantiate(avatarRoot);
 #if NDMF
             try
             {
-                if (AvatarBuildClientConfiguration.instance.ClientSideNDMFExecution) nadena.dev.ndmf.AvatarProcessor.ProcessAvatar(builded);
+                if (doNDMFManualBake) nadena.dev.ndmf.AvatarProcessor.ProcessAvatar(builded);
             }
             catch (Exception e) { Debug.LogException(e); }
 #endif
