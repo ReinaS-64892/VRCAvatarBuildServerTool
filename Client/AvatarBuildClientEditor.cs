@@ -19,8 +19,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             sObj.Update();
             using var ccs = new EditorGUI.ChangeCheckScope();
 
-            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildClientConfiguration.BuildServerURLs)));
-            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildClientConfiguration.ClientSideNDMFExecution)));
+            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildClientConfiguration.BuildServers)));
 
             if (ccs.changed)
             {

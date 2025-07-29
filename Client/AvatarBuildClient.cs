@@ -158,18 +158,29 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                 // PostAsync を使うとでかいバイナリを投げる時に壊れることがある、しかしなぜ？ 古い API は信用してはならないのかもしれない。
                 // var response = await _client.PostAsync(AvatarBuildClientConfiguration.instance.BuildServerURL, binaryContent);
 
-                var targetURLs = AvatarBuildClientConfiguration.instance.BuildServerURLs;
-                var postRequests = targetURLs.Select(url =>
+                var targetServers = AvatarBuildClientConfiguration.instance.BuildServers;
+                var postRequests = targetServers.Where(server => server.Enable).Select(server =>
                 {
                     var req = new HttpRequestMessage();
                     req.Content = binaryContent;
                     req.Method = HttpMethod.Post;
-                    req.RequestUri = new Uri(url);
-                    return req;
-                }).Select(req => { return _client.SendAsync(req); }).ToArray();
+                    req.RequestUri = new Uri(server.URL);
+                    return (req, server.URL);
+                }).Select(req => { return (_client.SendAsync(req.req), req.URL); }).ToArray();
 
-                var postResults = await Task.WhenAll(postRequests);
-                foreach (var postResult in postResults) { Debug.Log("POST Response :" + postResult.StatusCode); }
+                foreach (var postRequest in postRequests)
+                {
+                    try
+                    {
+                        var result = await postRequest.Item1;
+                        Debug.Log("POST Response :" + result.StatusCode + " from " + postRequest.URL);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogError("failed URL : " + postRequest.URL);
+                        Debug.LogException(e);
+                    }
+                }
             }
             catch (Exception e)
             {
