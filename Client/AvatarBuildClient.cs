@@ -31,82 +31,93 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
         public static void ClientSideNDMFManualBakeToDo() { DoImpl(true); }
         public static async void DoImpl(bool clientSideNDMFExecution = false)
         {
-            switch (Selection.activeObject)
+            var doID = Progress.Start("AvatarBuildClient-SentToBuild", "VRCAvatarBuildServerTool-BuildToServer");
+            try
             {
-                default: { Debug.Log("Unknown Target"); return; }
-                case GameObject gameObject:
-                    {
-                        var avatarRoot = gameObject;
-                        // VRCSDK の参照するのをサボっている。
-                        if (avatarRoot.GetComponent<Animator>() == null) { return; }
-                        EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "CloneAndBuildToAsset", 0f);
 
-                        var targetPath = CloneAndBuildToAsset(avatarRoot, clientSideNDMFExecution);
-
-                        EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Post data search", 0.1f);
-
-                        var sw = Stopwatch.StartNew();
-                        var targetGUID = AssetDatabase.AssetPathToGUID(targetPath);
-                        var transferAssets = GetDependenciesWithFiltered(targetPath);
-
-                        sw.Stop();
-                        Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
-                        EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Post data prepare", 0.2f);
-
-                        try
+                switch (Selection.activeObject)
+                {
+                    default: { Debug.Log("Unknown Target"); return; }
+                    case GameObject gameObject:
                         {
-                            sw.Restart();
-                            var internalBinary = await AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, new string[] { targetGUID });
+                            var avatarRoot = gameObject;
+                            // VRCSDK の参照するのをサボっている。
+                            if (avatarRoot.GetComponent<Animator>() == null) { return; }
+                            Progress.Report(doID, 0f, "CloneAndBuildToAsset");
+
+                            var targetPath = CloneAndBuildToAsset(avatarRoot, clientSideNDMFExecution);
+
+                            Progress.Report(doID, 0.1f, "Post data search");
+
+                            var sw = Stopwatch.StartNew();
+                            var targetGUID = AssetDatabase.AssetPathToGUID(targetPath);
+                            var transferAssets = GetDependenciesWithFiltered(targetPath);
+
                             sw.Stop();
-                            Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
-                            EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "POST", 0.95f);
-                            await PostInternalBinary(internalBinary);
+                            Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
+                            Progress.Report(doID, 0.2f, "Encode Assets");
+
+                            try
+                            {
+                                sw.Restart();
+                                var internalBinary = await AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, new string[] { targetGUID });
+                                sw.Stop();
+                                Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
+                                Progress.Report(doID, 0.95f, "POST");
+                                await PostInternalBinary(internalBinary);
+                            }
+                            finally
+                            {
+                                AssetDatabase.DeleteAsset(targetPath);
+                                Progress.Report(doID, 1f, "Exit");
+                            }
+                            Debug.Log("Exit Build transfer");
+                            Progress.Finish(doID, Progress.Status.Succeeded);
+                            return;
                         }
-                        finally
-                        {
-                            AssetDatabase.DeleteAsset(targetPath);
-                            EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Exit", 1f);
-                        }
-                        Debug.Log("Exit Build transfer");
-                        EditorUtility.ClearProgressBar();
-                        return;
-                    }
 #if CAU
-                case AvatarUploadSettingOrGroup aus:
-                    {
-                        EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "GetPrefabs from cAU", 0f);
-                        var targetAvatarRoots = GetPrefabFromCAU(aus);
-
-                        EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "CloneAndBuildToAsset", 0.1f);
-                        var targetPaths = targetAvatarRoots.Select(i => CloneAndBuildToAsset(i, clientSideNDMFExecution)).ToArray();
-
-                        EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Post data prepare", 0.7f);
-                        var sw = Stopwatch.StartNew();
-
-                        var targetGUIDs = targetPaths.Select(AssetDatabase.AssetPathToGUID);
-                        var transferAssets = GetDependenciesWithFiltered(targetPaths);
-
-                        sw.Stop();
-                        Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
-                        try
+                    case AvatarUploadSettingOrGroup aus:
                         {
-                            sw.Restart();
-                            var internalBinary = await AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, targetGUIDs);
-                            EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "POST", 0.95f);
+                            Progress.Report(doID, 0f, "GetPrefabs from cAU");
+                            var targetAvatarRoots = GetPrefabFromCAU(aus);
+
+                            Progress.Report(doID, 0.1f, "CloneAndBuildToAsset");
+                            var targetPaths = targetAvatarRoots.Select(i => CloneAndBuildToAsset(i, clientSideNDMFExecution)).ToArray();
+
+                            Progress.Report(doID, 0.7f, "Post data prepare");
+                            var sw = Stopwatch.StartNew();
+
+                            var targetGUIDs = targetPaths.Select(AssetDatabase.AssetPathToGUID);
+                            var transferAssets = GetDependenciesWithFiltered(targetPaths);
+
                             sw.Stop();
-                            Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
-                            await PostInternalBinary(internalBinary);
+                            Progress.Report(doID, 0.8f, "Encode Assets");
+                            Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
+                            try
+                            {
+                                sw.Restart();
+                                var internalBinary = await AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, targetGUIDs);
+                                sw.Stop();
+                                Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
+                                Progress.Report(doID, 0.95f, "POST");
+                                await PostInternalBinary(internalBinary);
+                            }
+                            finally
+                            {
+                                foreach (var targetPath in targetPaths) AssetDatabase.DeleteAsset(targetPath);
+                                Progress.Report(doID, 1f, "Exit");
+                            }
+                            Debug.Log("Exit Build transfer");
+                            Progress.Finish(doID, Progress.Status.Succeeded);
+                            return;
                         }
-                        finally
-                        {
-                            foreach (var targetPath in targetPaths) AssetDatabase.DeleteAsset(targetPath);
-                            EditorUtility.DisplayProgressBar("AvatarBuildClient-SentToBuild", "Exit", 1f);
-                        }
-                        Debug.Log("Exit Build transfer");
-                        EditorUtility.ClearProgressBar();
-                        return;
-                    }
 #endif
+                }
+            }
+            catch (Exception e)
+            {
+                Progress.Finish(doID, Progress.Status.Failed);
+                throw e;
             }
         }
 
