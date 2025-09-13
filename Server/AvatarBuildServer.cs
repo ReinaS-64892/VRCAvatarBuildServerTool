@@ -126,7 +126,13 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                 try
                 {
                     s_isTaskDoing = true;
-                    if (VRCSdkControlPanel.TryGetBuilder(out IVRCSdkAvatarBuilderApi sdk) is false) { Debug.Log("filed to get builder "); return; }
+                    var sdk = default(IVRCSdkAvatarBuilderApi);
+
+                    if (VRCSdkControlPanel.window == null) { EditorApplication.ExecuteMenuItem("VRChat SDK/Show Control Panel"); }
+                    while (VRCSdkControlPanel.TryGetBuilder(out sdk) is false)
+                    { await Task.Delay(100); }
+                    if (await TryLogin() is false) { Debug.LogError("何らかの原因でログインできなかったよ〜！"); return; }
+
                     await UploadFromTransferred(sdk, bytes);
                 }
                 catch (Exception e) { Debug.LogException(e); }
@@ -182,10 +188,6 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             VRCAvatar vrcAvatar;
             if (isNewAvatar)
             {
-                pipelineManager.AssignId();
-                EditorUtility.SetDirty(pipelineManager);
-                PrefabUtility.SavePrefabAsset(prefab);
-
                 vrcAvatar = new()
                 {
                     Name = prefab.name,
@@ -193,12 +195,43 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                     Tags = new List<string>(),
                     ReleaseStatus = "private"
                 };
+                vrcAvatar = await VRCApi.CreateAvatarRecord(vrcAvatar);
+                if (string.IsNullOrEmpty(vrcAvatar.ID)) throw new Exception("Failed to reserve an avatar ID");
+                pipelineManager.blueprintId = vrcAvatar.ID;
+                EditorUtility.SetDirty(pipelineManager);
+                PrefabUtility.SavePrefabAsset(prefab);
             }
             else vrcAvatar = await VRCApi.GetAvatar(pipelineManager.blueprintId);
             var thumbnailPath = isNewAvatar ? AssetDatabase.GUIDToAssetPath(TemporaryThumbnailGUID) : null;
 
             await sdk.BuildAndUpload(prefab, vrcAvatar, thumbnailPath);
             Debug.Log("upload:" + prefab.name);
+        }
+
+        // MIT LICENSE https://github.com/anatawa12/ContinuousAvatarUploader/blob/d6b8fd82fac6c4734664d57914d02a8092cb5dc7/LICENSE
+        // Copyright (c) 2023 anatawa12
+        // copy from CAU Uploader https://github.com/anatawa12/ContinuousAvatarUploader/blob/d6b8fd82fac6c4734664d57914d02a8092cb5dc7/Editor/Uploader.cs#L89-L114
+        public static async Task<bool> TryLogin()
+        {
+            if (!ConfigManager.RemoteConfig.IsInitialized())
+            {
+                API.SetOnlineMode(true);
+                ConfigManager.RemoteConfig.Init();
+            }
+            if (!APIUser.IsLoggedIn && ApiCredentials.Load())
+            {
+                var task = new TaskCompletionSource<bool>();
+                APIUser.InitialFetchCurrentUser(c =>
+                {
+                    AnalyticsSDK.LoggedInUserChanged(c.Model as APIUser);
+                    task.TrySetResult(true);
+                }, e =>
+                {
+                    task.TrySetException(new Exception(e?.Error ?? "Unknown error"));
+                });
+                await task.Task;
+            }
+            return APIUser.IsLoggedIn;
         }
     }
 }
