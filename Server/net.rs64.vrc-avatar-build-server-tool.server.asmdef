@@ -22,7 +22,7 @@
     "versionDefines": [
         {
             "name": "com.vrchat.avatars",
-            "expression": "3.7.0",
+            "expression": "3.9.0-beta.1",
             "define": "VRCSDK_AVATAR"
         }
     ],
