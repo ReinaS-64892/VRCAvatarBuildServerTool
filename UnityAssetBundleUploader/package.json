@@ -1,0 +1,16 @@
+{
+  "name": "net.rs64.vrc-avatar-build-server-tool.uploader",
+  "displayName": "VRChatAvatarBuildServerTool - Uploader",
+  "version": "0.0.0",
+  "unity": "2022.3",
+  "description": "VRChat Avatar Build On Server!",
+  "vpmDependencies": {
+    "com.vrchat.base": "3.9.0-beta.1",
+    "com.vrchat.avatars": "3.9.0-beta.1"
+  },
+  "url": "https://github.com/ReinaS-64892/VRChatAvatarBuildServerTool",
+  "author": {
+    "name": "ReinaSakiria",
+    "url": "https://rs64.net/"
+  }
+}

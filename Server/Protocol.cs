@@ -1,5 +1,7 @@
 namespace net.rs64.VRCAvatarBuildServerTool.Server;
 
+
+
 public class BuildRequest
 {
     // Unity の GUID
@@ -18,4 +20,17 @@ public class BuildRequestResponse
 {
     public string ResultCode { get; set; } = "";
     public string[] MissingFiles { get; set; } = [];
+
+
+    public const string MissingAssets = "MissingAssets";
+    public const string BuildRequestAccept = "BuildRequestAccept";
+}
+
+
+
+public class UploadRequest
+{
+    public bool IsNewAvatar { get; set; } = false;
+    public string BlueprintID { get; set; } = "";
+    public string AssetBundleBase64 { get; set; } = "";
 }

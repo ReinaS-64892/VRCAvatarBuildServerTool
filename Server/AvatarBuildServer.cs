@@ -77,7 +77,7 @@ public class AvatarBuildServer
                                 case BuildRequestResult.MissingAssets missingAssets:
                                     {
                                         Console.WriteLine("MissingAssets");
-                                        var responseSource = new BuildRequestResponse() { ResultCode = "MissingAssets", MissingFiles = missingAssets.MissingFiles };
+                                        var responseSource = new BuildRequestResponse() { ResultCode = BuildRequestResponse.MissingAssets, MissingFiles = missingAssets.MissingFiles };
                                         var response = JsonSerializer.Serialize(responseSource);
                                         var responseBytes = System.Text.Encoding.UTF8.GetBytes(response);
 
@@ -90,7 +90,7 @@ public class AvatarBuildServer
                                 case BuildRequestResult.BuildRequestAccept:
                                     {
                                         Console.WriteLine("BuildRequestAccept");
-                                        var responseSource = new BuildRequestResponse() { ResultCode = "BuildRequestAccept", MissingFiles = [] };
+                                        var responseSource = new BuildRequestResponse() { ResultCode = BuildRequestResponse.BuildRequestAccept, MissingFiles = [] };
                                         var response = JsonSerializer.Serialize(responseSource);
                                         var responseBytes = System.Text.Encoding.UTF8.GetBytes(response);
 
