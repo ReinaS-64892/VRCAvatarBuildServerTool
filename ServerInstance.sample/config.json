@@ -1,0 +1,8 @@
+{
+    "ListenAddress": [
+        "http://127.0.0.1:9505/"
+    ],
+    "MaxMultipleEditorCount": 2,
+    "UnityEditor": "/home/あなたのインストールしたディレクトリ/2022.3.22f1/Editor/Unity",
+    "ServerPasscodeHeader": "一応、ランダムな文字列を入れましょう"
+}

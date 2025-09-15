@@ -1,6 +1,6 @@
 using UnityEditor;
 
-namespace net.rs64.VRCAvatarBuildServerTool.Client
+namespace net.rs64.VRCAvatarBuildServerTool.UnityClient
 {
     [EditorWindowTitle(title = "AvatarBuildClientEditor")]
     internal sealed class AvatarBuildClientEditor : EditorWindow

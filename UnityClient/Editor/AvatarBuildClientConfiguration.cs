@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace net.rs64.VRCAvatarBuildServerTool.Client
+namespace net.rs64.VRCAvatarBuildServerTool.UnityClient
 {
     [FilePath("ProjectSettings/AvatarBuildClientConfiguration.asset", FilePathAttribute.Location.PreferencesFolder)]
     internal sealed class AvatarBuildClientConfiguration : ScriptableSingleton<AvatarBuildClientConfiguration>
@@ -18,6 +18,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
     internal class BuildServer
     {
         public bool Enable = true;
-        public string URL = "http://127.0.0.1:8080";
+        public string URL = "http://127.0.0.1:9505/";
+        public string ServerPasscodeHeader = "";
     }
 }

@@ -1,13 +1,17 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using net.rs64.VRCAvatarBuildServerTool.Transfer;
 using UnityEditor;
 using UnityEngine;
 using System.Diagnostics;
 using Debug = UnityEngine.Debug;
+using System.Security.Cryptography;
+using System.IO;
+using System.Text;
+using System.Threading;
 
 
 
@@ -15,12 +19,12 @@ using Debug = UnityEngine.Debug;
 using Anatawa12.ContinuousAvatarUploader.Editor;
 #endif
 
-namespace net.rs64.VRCAvatarBuildServerTool.Client
+namespace net.rs64.VRCAvatarBuildServerTool.UnityClient
 {
 
     public static class AvatarBuildClient
     {
-        static HttpClient _client;
+        static HttpClient? _client;
 
         [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer")]
         [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer")]
@@ -34,6 +38,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             var doID = Progress.Start("AvatarBuildClient-SentToBuild", "VRCAvatarBuildServerTool-BuildToServer");
             try
             {
+                var transferTargetFiles = new List<string>();//TODO : ここで Packages を入れる
 
                 switch (Selection.activeObject)
                 {
@@ -51,20 +56,19 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
 
                             var sw = Stopwatch.StartNew();
                             var targetGUID = AssetDatabase.AssetPathToGUID(targetPath);
-                            var transferAssets = GetDependenciesWithFiltered(targetPath);
+                            transferTargetFiles.AddRange(GetDependenciesWithFiltered(targetPath));
 
                             sw.Stop();
                             Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
-                            Progress.Report(doID, 0.2f, "Encode Assets");
+                            Progress.Report(doID, 0.2f, "Build Sending");
 
                             try
                             {
                                 sw.Restart();
-                                var internalBinary = await AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, new string[] { targetGUID });
+                                await Task.Run(() => SendBuild(new() { targetGUID }, transferTargetFiles));
                                 sw.Stop();
-                                Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
-                                Progress.Report(doID, 0.95f, "POST");
-                                await PostInternalBinary(internalBinary);
+                                Debug.Log("Build Sending :" + sw.ElapsedMilliseconds + "ms");
+                                Progress.Report(doID, 0.95f, "Exiting");
                             }
                             finally
                             {
@@ -120,6 +124,89 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                 throw e;
             }
         }
+        public static async Task<string> GetHash(string filePath)
+        {
+            // SHA1 はスレッドセーフではない
+            using var sha = SHA1.Create();
+            var hash = sha.ComputeHash(await File.ReadAllBytesAsync(filePath));
+            return Convert.ToBase64String(hash);
+        }
+        private static async Task SendBuild(List<string> targets, List<string> targetFiles)
+        {
+            var targetFileHashesKv = await Task.WhenAll(
+                targetFiles.Select(
+                    f => Task.Run(async () => new PathToHash()
+                    {
+                        Path = f,
+                        Hash = await GetHash(f)
+                    }
+                    )
+                )
+            );
+            var buildRequest = new BuildRequest() { BuildTargets = targets, Assets = targetFileHashesKv };
+            var buildRequestJson = JsonUtility.ToJson(buildRequest);
+            var buildRequestBytes = Encoding.UTF8.GetBytes(buildRequestJson);
+            using var buildRequestBinaryContent = new ByteArrayContent(buildRequestBytes);
+
+            foreach (var server in AvatarBuildClientConfiguration.instance.BuildServers)
+            {
+                if (server.Enable is false) { continue; }
+
+                var buildURI = new Uri(server.URL + "Build");
+                var fileURI = new Uri(server.URL + "File");
+
+                _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(360) };
+                if (_client.DefaultRequestHeaders.Contains("Authorization")) _client.DefaultRequestHeaders.Remove("Authorization");
+                _client.DefaultRequestHeaders.Add("Authorization", server.ServerPasscodeHeader);
+
+                var transferBytes = 0L;
+                for (var i = 0; 4 > i; i += 1)//とりあえず safety として 4回
+                {
+                    try
+                    {
+                        var response = await _client.PostAsync(buildURI, buildRequestBinaryContent);
+                        if (response.StatusCode is not System.Net.HttpStatusCode.OK) { Debug.LogError("Unknown Error"); break; }
+                        if (response.Content is null) { Debug.LogError("Unknown Error"); break; }
+
+                        var responseJson = Encoding.UTF8.GetString(await response.Content.ReadAsByteArrayAsync());
+                        var requestResponse = JsonUtility.FromJson<BuildRequestResponse>(responseJson);
+
+                        switch (requestResponse.ResultCode)
+                        {
+                            default: { break; }
+                            case "BuildRequestAccept":
+                                {
+                                    Debug.Log("BuildRequestAccept!");
+                                    goto LoopExit;// 渋い気持ち
+                                }
+                            case "MissingAssets":
+                                {
+                                    Debug.Log("MissingAssets!");
+                                    var filePostTask = requestResponse.MissingFiles.Select(async f =>
+                                        {
+                                            var bytes = await File.ReadAllBytesAsync(f);
+                                            using var fileBytesContents = new ByteArrayContent(bytes);
+                                            var res = await _client.PostAsync(fileURI, fileBytesContents);
+                                            Debug.Log("File POST:" + res.StatusCode + " - " + f);
+                                            Interlocked.Add(ref transferBytes, bytes.LongLength);
+                                        }
+                                    ).ToArray();
+                                    await Task.WhenAll(filePostTask);
+                                    break;
+                                }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogException(e);
+                    }
+                }
+
+            LoopExit:
+
+                Debug.Log("file transferer size for:" + transferBytes / (1024.0 * 1024.0) + "mb");
+            }
+        }
 
 #if CAU
         private static List<GameObject> GetPrefabFromCAU(AvatarUploadSettingOrGroup aus, List<GameObject> avatarRoots = null)
@@ -162,47 +249,6 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             return avatarRoots;
         }
 #endif
-
-        private static async Task PostInternalBinary(byte[] internalBinary)
-        {
-            try
-            {
-                Debug.Log("internal binary size for:" + internalBinary.LongLength / (1024.0 * 1024.0) + "mb");
-                _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(360) };
-                using var binaryContent = new ByteArrayContent(internalBinary);
-
-                // PostAsync を使うとでかいバイナリを投げる時に壊れることがある、しかしなぜ？ 古い API は信用してはならないのかもしれない。
-                // var response = await _client.PostAsync(AvatarBuildClientConfiguration.instance.BuildServerURL, binaryContent);
-
-                var targetServers = AvatarBuildClientConfiguration.instance.BuildServers;
-                var postRequests = targetServers.Where(server => server.Enable).Select(server =>
-                {
-                    var req = new HttpRequestMessage();
-                    req.Content = binaryContent;
-                    req.Method = HttpMethod.Post;
-                    req.RequestUri = new Uri(server.URL);
-                    return (req, server.URL);
-                }).Select(req => { return (_client.SendAsync(req.req), req.URL); }).ToArray();
-
-                foreach (var postRequest in postRequests)
-                {
-                    try
-                    {
-                        var result = await postRequest.Item1;
-                        Debug.Log("POST Response :" + result.StatusCode + " from " + postRequest.URL);
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogError("failed URL : " + postRequest.URL);
-                        Debug.LogException(e);
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogException(e);
-            }
-        }
 
         private static string CloneAndBuildToAsset(GameObject avatarRoot, bool doNDMFManualBake)
         {
