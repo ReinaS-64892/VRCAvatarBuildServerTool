@@ -1,4 +1,3 @@
-using net.rs64.VRCAvatarBuildServerTool.Uploader;
 using UnityEditor;
 using UnityEngine;
 
