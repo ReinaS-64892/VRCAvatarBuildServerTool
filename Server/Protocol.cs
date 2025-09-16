@@ -27,10 +27,24 @@ public class BuildRequestResponse
 }
 
 
-
+public class UploaderProjectConfig
+{
+    public string UploaderServerPort { get; set; } = "";
+    public string InternalServerURL { get; set; } = "";
+    public string AuthorizationCode { get; set; } = "";
+}
 public class UploadRequest
 {
     public bool IsNewAvatar { get; set; } = false;
     public string BlueprintID { get; set; } = "";
     public string AssetBundleBase64 { get; set; } = "";
+}
+
+
+
+public class BuildRunnerProjectConfig
+{
+    public string BuildRunnerServerPort { get; set; } = "";
+    public string InternalServerURL { get; set; } = "";
+    public string AuthorizationCode { get; set; } = "";
 }

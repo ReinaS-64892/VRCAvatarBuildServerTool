@@ -25,6 +25,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.UnityClient
     public static class AvatarBuildClient
     {
         static HttpClient? _client;
+        private static List<BuildServer>? _BuildTargetServers;
 
         [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer")]
         [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer")]
@@ -56,7 +57,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.UnityClient
 
                             var sw = Stopwatch.StartNew();
                             var targetGUID = AssetDatabase.AssetPathToGUID(targetPath);
-                            transferTargetFiles.AddRange(GetDependenciesWithFiltered(targetPath));
+                            transferTargetFiles.AddRange(GetDependenciesWithFiltered(targetPath).SelectMany(p => new[] { p, p + ".meta" }));
 
                             sw.Stop();
                             Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
@@ -65,7 +66,8 @@ namespace net.rs64.VRCAvatarBuildServerTool.UnityClient
                             try
                             {
                                 sw.Restart();
-                                await Task.Run(() => SendBuild(new() { targetGUID }, transferTargetFiles));
+                                _BuildTargetServers = AvatarBuildClientConfiguration.instance.BuildServers;
+                                await Task.Run(() => SendBuildRun(new() { targetGUID }, transferTargetFiles));
                                 sw.Stop();
                                 Debug.Log("Build Sending :" + sw.ElapsedMilliseconds + "ms");
                                 Progress.Report(doID, 0.95f, "Exiting");
@@ -80,41 +82,41 @@ namespace net.rs64.VRCAvatarBuildServerTool.UnityClient
                             return;
                         }
 #if CAU
-                    case AvatarUploadSettingOrGroup aus:
-                        {
-                            Progress.Report(doID, 0f, "GetPrefabs from cAU");
-                            var targetAvatarRoots = GetPrefabFromCAU(aus);
+                        // case AvatarUploadSettingOrGroup aus:
+                        //     {
+                        //         Progress.Report(doID, 0f, "GetPrefabs from cAU");
+                        //         var targetAvatarRoots = GetPrefabFromCAU(aus);
 
-                            Progress.Report(doID, 0.1f, "CloneAndBuildToAsset");
-                            var targetPaths = targetAvatarRoots.Select(i => CloneAndBuildToAsset(i, clientSideNDMFExecution)).ToArray();
+                        //         Progress.Report(doID, 0.1f, "CloneAndBuildToAsset");
+                        //         var targetPaths = targetAvatarRoots.Select(i => CloneAndBuildToAsset(i, clientSideNDMFExecution)).ToArray();
 
-                            Progress.Report(doID, 0.7f, "Post data prepare");
-                            var sw = Stopwatch.StartNew();
+                        //         Progress.Report(doID, 0.7f, "Post data prepare");
+                        //         var sw = Stopwatch.StartNew();
 
-                            var targetGUIDs = targetPaths.Select(AssetDatabase.AssetPathToGUID);
-                            var transferAssets = GetDependenciesWithFiltered(targetPaths);
+                        //         var targetGUIDs = targetPaths.Select(AssetDatabase.AssetPathToGUID);
+                        //         var transferAssets = GetDependenciesWithFiltered(targetPaths);
 
-                            sw.Stop();
-                            Progress.Report(doID, 0.8f, "Encode Assets");
-                            Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
-                            try
-                            {
-                                sw.Restart();
-                                var internalBinary = await AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, targetGUIDs);
-                                sw.Stop();
-                                Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
-                                Progress.Report(doID, 0.95f, "POST");
-                                await PostInternalBinary(internalBinary);
-                            }
-                            finally
-                            {
-                                foreach (var targetPath in targetPaths) AssetDatabase.DeleteAsset(targetPath);
-                                Progress.Report(doID, 1f, "Exit");
-                            }
-                            Debug.Log("Exit Build transfer");
-                            Progress.Finish(doID, Progress.Status.Succeeded);
-                            return;
-                        }
+                        //         sw.Stop();
+                        //         Progress.Report(doID, 0.8f, "Encode Assets");
+                        //         Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
+                        //         try
+                        //         {
+                        //             sw.Restart();
+                        //             var internalBinary = await AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, targetGUIDs);
+                        //             sw.Stop();
+                        //             Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
+                        //             Progress.Report(doID, 0.95f, "POST");
+                        //             await PostInternalBinary(internalBinary);
+                        //         }
+                        //         finally
+                        //         {
+                        //             foreach (var targetPath in targetPaths) AssetDatabase.DeleteAsset(targetPath);
+                        //             Progress.Report(doID, 1f, "Exit");
+                        //         }
+                        //         Debug.Log("Exit Build transfer");
+                        //         Progress.Finish(doID, Progress.Status.Succeeded);
+                        //         return;
+                        //     }
 #endif
                 }
             }
@@ -130,6 +132,17 @@ namespace net.rs64.VRCAvatarBuildServerTool.UnityClient
             using var sha = SHA1.Create();
             var hash = sha.ComputeHash(await File.ReadAllBytesAsync(filePath));
             return Convert.ToBase64String(hash);
+        }
+        private static async Task SendBuildRun(List<string> targets, List<string> targetFiles)
+        {
+            try
+            {
+                await SendBuild(targets, targetFiles);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
         }
         private static async Task SendBuild(List<string> targets, List<string> targetFiles)
         {
@@ -148,7 +161,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.UnityClient
             var buildRequestBytes = Encoding.UTF8.GetBytes(buildRequestJson);
             using var buildRequestBinaryContent = new ByteArrayContent(buildRequestBytes);
 
-            foreach (var server in AvatarBuildClientConfiguration.instance.BuildServers)
+            foreach (var server in _BuildTargetServers!)
             {
                 if (server.Enable is false) { continue; }
 

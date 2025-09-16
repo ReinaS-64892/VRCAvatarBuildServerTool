@@ -12,6 +12,13 @@ using UnityEngine;
 namespace net.rs64.VRCAvatarBuildServerTool.Uploader
 {
     [Serializable]
+    public class UploaderProjectConfig
+    {
+        public string UploaderServerPort;
+        public string InternalServerURL;
+        public string AuthorizationCode;
+    }
+    [Serializable]
     public class UploadRequest
     {
         public bool IsNewAvatar;
