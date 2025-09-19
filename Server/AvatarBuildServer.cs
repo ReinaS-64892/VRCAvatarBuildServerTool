@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,11 +23,12 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
         {
             if (_serverInstance != null) { Debug.Log("Server is already started"); return; }
             var address = AvatarBuildServerConfiguration.instance.BuildServerListenAddress;
+            var passCode = AvatarBuildServerConfiguration.instance.ServerPasscode;
             var mainThreadContext = SynchronizationContext.Current;
 
             EditorApplication.update += BuilderLoop;
 
-            _serverInstance = new(address, mainThreadContext);
+            _serverInstance = new(address, passCode, mainThreadContext);
         }
         public static void ServerExit()
         {
@@ -39,89 +41,177 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             string _address;
             SynchronizationContext _postCtx;
 
-            HttpListener _httpListener;
-
+            HttpListener _httpServer;
+            private string _passCode;
             CancellationTokenSource _serverCancellationTokenSource;
 
             Task _listenTask;
+            internal CashFileManager _cashManager;
 
-            public BuildServerInstance(string address, SynchronizationContext post)
+            public BuildServerInstance(string address, string passCode, SynchronizationContext post)
             {
                 _address = address;
                 _postCtx = post;
-                _httpListener = new();
-                _httpListener.Prefixes.Add(address);
+                _httpServer = new();
+                _httpServer.Prefixes.Add(address);
+                _passCode = passCode;
 
                 _serverCancellationTokenSource = new();
 
-                _listenTask = Task.Run(Loop);
+                _listenTask = Task.Run(() => Loop(_serverCancellationTokenSource.Token));
+                _cashManager = new CashFileManager(Path.GetFullPath("Library/VRCAvatarBuildServerCash"));
             }
 
-            async void Loop()
+
+
+            async Task Loop(CancellationToken token)
             {
-                _httpListener.Start();
+                _httpServer.Start();
                 try
                 {
-                    var cancellationToken = _serverCancellationTokenSource.Token;
-                    while (cancellationToken.IsCancellationRequested is false)
+                    while (token.IsCancellationRequested is false)
                     {
-                        var ctxTask = _httpListener.GetContextAsync();
-                        ctxTask.Wait(cancellationToken);
-
-                        if (ctxTask.IsCompleted is false) { return; }
-
-                        var ctx = await ctxTask;
-                        var req = ctx.Request;
-                        if (req.HttpMethod != "POST") { Debug.Log("Unknown Request"); ctx.Response.StatusCode = 400; ctx.Response.Close(); }
-                        if (req.InputStream is null) { Debug.Log("POST data is not found"); ctx.Response.StatusCode = 400; ctx.Response.Close(); }
-
-                        var memStream = new MemoryStream((int)req.ContentLength64);
-                        await req.InputStream.CopyToAsync(memStream);
-
-                        ctx.Response.StatusCode = 200;
-                        ctx.Response.Close();
-
-                        _postCtx.Post(byteArray => EnQueue(byteArray as byte[]), memStream.ToArray());
+                        var ctxTask = _httpServer.GetContextAsync();
+                        ctxTask.Wait(token);
+                        if (ctxTask.IsCompleted is false) { break; }
+                        await Response(await ctxTask);
                     }
                 }
                 catch (Exception e)
                 {
                     if (e is not OperationCanceledException)
-                        Debug.LogException(e);
+                        Debug.Log(e);
                 }
                 finally
                 {
-                    _httpListener.Stop();
+                    _httpServer.Stop();
                 }
             }
+
+            private async Task Response(HttpListenerContext ctx)
+            {
+                var req = ctx.Request;
+
+                // 返す code はもう少し何とかするべきではあると思う
+                if (req.Headers.Get("Authorization") != _passCode) { Debug.Log("Authorization failed"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                if (req.Url is null) { Debug.Log("URI not found"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                if (req.HttpMethod != "POST") { Debug.Log("Unknown Request"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                if (req.InputStream is null) { Debug.Log("POST data is not found"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+
+                switch (req.Url.AbsolutePath)
+                {
+                    default: { Debug.Log("Unknown Request"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                    case "/Build":
+                        {
+                            var memStream = new MemoryStream((int)req.ContentLength64);
+                            await req.InputStream.CopyToAsync(memStream);
+                            var jsonString = System.Text.Encoding.UTF8.GetString(memStream.ToArray());
+
+                            var result = BuildRequestRun(jsonString);
+
+                            switch (result)
+                            {
+                                default: { Debug.Log("Unknown Error"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                                case BuildRequestResult.CanNotReadJson:
+                                    { Debug.Log("CanNotReadJson"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                                case BuildRequestResult.BuildTargetNotFound:
+                                    { Debug.Log("BuildTargetNotFound"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                                case BuildRequestResult.MissingAssets missingAssets:
+                                    {
+                                        Debug.Log("MissingAssets");
+                                        var responseSource = new BuildRequestResponse() { ResultCode = BuildRequestResponse.MissingAssets, MissingFiles = missingAssets.MissingFiles };
+                                        var response = JsonUtility.ToJson(responseSource);
+                                        var responseBytes = System.Text.Encoding.UTF8.GetBytes(response);
+
+                                        ctx.Response.OutputStream.Write(responseBytes);
+                                        ctx.Response.Close();
+                                        return;
+                                    }
+                                case BuildRequestResult.BuildRequestAccept:
+                                    {
+                                        Debug.Log("BuildRequestAccept");
+                                        var responseSource = new BuildRequestResponse() { ResultCode = BuildRequestResponse.BuildRequestAccept, MissingFiles = Array.Empty<string>() };
+                                        var response = JsonUtility.ToJson(responseSource);
+                                        var responseBytes = System.Text.Encoding.UTF8.GetBytes(response);
+
+                                        ctx.Response.OutputStream.Write(responseBytes);
+                                        ctx.Response.Close();
+                                        return;
+                                    }
+                            }
+                        }
+                    case "/File":
+                        {
+                            var memStream = new MemoryStream((int)req.ContentLength64);
+                            await req.InputStream.CopyToAsync(memStream);
+
+                            _cashManager.AddFile(memStream.ToArray());
+
+                            ctx.Response.StatusCode = 200;
+                            ctx.Response.Close();
+                            return;
+                        }
+
+                }
+            }
+
+            private BuildRequestResult BuildRequestRun(string jsonString)
+            {
+                var buildRequest = JsonUtility.FromJson<BuildRequest>(jsonString);
+
+                if (buildRequest is null) { return new BuildRequestResult.CanNotReadJson(); }
+                if (buildRequest.BuildTargets.Any() is false) { return new BuildRequestResult.BuildTargetNotFound(); }
+
+                var missing = buildRequest.Assets.Where(a => _cashManager.HasFile(a.Hash) is false).Select(a => { Debug.Log("not cash :" + a.Path + "-" + a.Hash); return a.Path; }).ToArray();
+                if (missing.Length is not 0) { return new BuildRequestResult.MissingAssets(missing); }
+
+                EnQueue(buildRequest);
+                return new BuildRequestResult.BuildRequestAccept();
+            }
+            public abstract record BuildRequestResult
+            {
+                public record CanNotReadJson : BuildRequestResult { }
+                public record BuildTargetNotFound : BuildRequestResult { }
+
+                public record MissingAssets : BuildRequestResult
+                {
+                    public string[] MissingFiles;
+                    public MissingAssets(string[] missingFiles)
+                    {
+                        MissingFiles = missingFiles;
+                    }
+                }
+                public record BuildRequestAccept : BuildRequestResult { }
+            }
+
             public void Dispose()
             {
                 _serverCancellationTokenSource.Cancel();
-                _httpListener?.Close();
-                _httpListener = null;
+                _httpServer?.Close();
+                _httpServer = null;
                 _listenTask = null;
             }
         }
 
         static volatile bool s_isTaskDoing;//しぶわいねぇ ... うーん
-        static Queue<byte[]> buildTaskQueue = new();
+        static Queue<BuildRequest> buildTaskQueue = new();
         const string TemporaryThumbnailGUID = "bf34225cf0fe6be64b94e281fb3a55ce";
-        public static void EnQueue(byte[] bytes)
+        public static void EnQueue(BuildRequest req)
         {
             lock (buildTaskQueue)
             {
-                buildTaskQueue.Enqueue(bytes);
+                buildTaskQueue.Enqueue(req);
             }
         }
         static void BuilderLoop()
         {
             if (s_isTaskDoing) { return; }
-            byte[] task;
+            BuildRequest task;
             lock (buildTaskQueue) { buildTaskQueue.TryDequeue(out task); }
 
             if (task is not null) CallAsyncVoid(task);
 
-            static async void CallAsyncVoid(byte[] bytes)
+            static async void CallAsyncVoid(BuildRequest bytes)
             {
                 try
                 {
@@ -143,10 +233,8 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             }
         }
 
-        static async Task UploadFromTransferred(IVRCSdkAvatarBuilderApi sdk, byte[] bytes)
+        static async Task UploadFromTransferred(IVRCSdkAvatarBuilderApi sdk, BuildRequest bytes)
         {
-            var (zipMemStream, guids) = AssetTransferProtocol.DecodeAssetsAndTargetGUID(bytes);
-            var zip = new ZipArchive(zipMemStream, ZipArchiveMode.Read);
 
             var destPath = "Assets/ZZZ___TTransferredAssets";
             if (Directory.Exists(destPath)) { Directory.Delete(destPath, true); }
@@ -154,14 +242,14 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
 
             try
             {
-                zip.ExtractToDirectory(destPath);
+                await LoadFiles(destPath, bytes.Assets);
                 AssetDatabase.ImportAsset(destPath, ImportAssetOptions.ImportRecursive);
 
-                var count = guids.Count;
+                var count = bytes.BuildTargets.Count;
                 var i = 0;
                 EditorUtility.DisplayProgressBar("upload avatar(s)", "", 0.0f);
 
-                foreach (var guid in guids)
+                foreach (var guid in bytes.BuildTargets)
                 {
                     await BuildToUploadFromGUID(sdk, guid);
 
@@ -176,6 +264,31 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
 
                 EditorUtility.ClearProgressBar();
             }
+        }
+
+        private static async Task LoadFiles(string destPath, List<PathToHash> assets)
+        {
+            await Task.WhenAll(assets.Where(a =>
+                            {
+                                if (_serverInstance._cashManager.HasFile(a.Hash) is false)
+                                {
+                                    Debug.LogWarning("not fount " + a.Hash + ":" + a.Path); return false;
+                                }
+                                return true;
+                            }
+                        ).Select(async a =>
+                          await WriteFile(Path.Combine(destPath, a.Path), await _serverInstance._cashManager.GetFile(a.Hash))
+                        )
+            );
+        }
+        private static async Task WriteFile(string path, byte[] fileBytes)
+        {
+            var parentDirectory = new DirectoryInfo(path).Parent!.FullName;
+            try { if (Directory.Exists(parentDirectory) is false) Directory.CreateDirectory(parentDirectory); }
+            catch (Exception e) { Console.WriteLine(e); }
+
+            Console.WriteLine("write ! : " + path);
+            await File.WriteAllBytesAsync(path, fileBytes);
         }
 
         private static async Task BuildToUploadFromGUID(IVRCSdkAvatarBuilderApi sdk, string guid)
