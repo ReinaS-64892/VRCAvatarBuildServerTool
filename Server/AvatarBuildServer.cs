@@ -80,7 +80,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                 catch (Exception e)
                 {
                     if (e is not OperationCanceledException)
-                        Console.WriteLine(e);
+                        Debug.Log(e);
                 }
                 finally
                 {
@@ -93,14 +93,14 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                 var req = ctx.Request;
 
                 // 返す code はもう少し何とかするべきではあると思う
-                if (req.Headers.Get("Authorization") != _passCode) { Console.WriteLine("Authorization failed"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
-                if (req.Url is null) { Console.WriteLine("URI not found"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
-                if (req.HttpMethod != "POST") { Console.WriteLine("Unknown Request"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
-                if (req.InputStream is null) { Console.WriteLine("POST data is not found"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                if (req.Headers.Get("Authorization") != _passCode) { Debug.Log("Authorization failed"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                if (req.Url is null) { Debug.Log("URI not found"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                if (req.HttpMethod != "POST") { Debug.Log("Unknown Request"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                if (req.InputStream is null) { Debug.Log("POST data is not found"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
 
                 switch (req.Url.AbsolutePath)
                 {
-                    default: { Console.WriteLine("Unknown Request"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                    default: { Debug.Log("Unknown Request"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
                     case "/Build":
                         {
                             var memStream = new MemoryStream((int)req.ContentLength64);
@@ -111,33 +111,30 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
 
                             switch (result)
                             {
-                                default: { Console.WriteLine("Unknown Error"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                                default: { Debug.Log("Unknown Error"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
                                 case BuildRequestResult.CanNotReadJson:
-                                    { Console.WriteLine("CanNotReadJson"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                                    { Debug.Log("CanNotReadJson"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
                                 case BuildRequestResult.BuildTargetNotFound:
-                                    { Console.WriteLine("BuildTargetNotFound"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+                                    { Debug.Log("BuildTargetNotFound"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
                                 case BuildRequestResult.MissingAssets missingAssets:
                                     {
-                                        Console.WriteLine("MissingAssets");
+                                        Debug.Log("MissingAssets");
                                         var responseSource = new BuildRequestResponse() { ResultCode = BuildRequestResponse.MissingAssets, MissingFiles = missingAssets.MissingFiles };
                                         var response = JsonUtility.ToJson(responseSource);
                                         var responseBytes = System.Text.Encoding.UTF8.GetBytes(response);
 
                                         ctx.Response.OutputStream.Write(responseBytes);
-                                        // ctx.Response.StatusCode = 400; // これを書き込んでも強制的に 200 にさせられる様子 ... は?
-                                        ctx.Response.StatusCode = 200;
                                         ctx.Response.Close();
                                         return;
                                     }
                                 case BuildRequestResult.BuildRequestAccept:
                                     {
-                                        Console.WriteLine("BuildRequestAccept");
+                                        Debug.Log("BuildRequestAccept");
                                         var responseSource = new BuildRequestResponse() { ResultCode = BuildRequestResponse.BuildRequestAccept, MissingFiles = Array.Empty<string>() };
                                         var response = JsonUtility.ToJson(responseSource);
                                         var responseBytes = System.Text.Encoding.UTF8.GetBytes(response);
 
                                         ctx.Response.OutputStream.Write(responseBytes);
-                                        ctx.Response.StatusCode = 200;
                                         ctx.Response.Close();
                                         return;
                                     }
@@ -165,7 +162,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                 if (buildRequest is null) { return new BuildRequestResult.CanNotReadJson(); }
                 if (buildRequest.BuildTargets.Any() is false) { return new BuildRequestResult.BuildTargetNotFound(); }
 
-                var missing = buildRequest.Assets.Where(a => _cashManager.HasFile(a.Hash) is false).Select(a => { Console.WriteLine(a.Path + "-" + a.Hash); return a.Path; }).ToArray();
+                var missing = buildRequest.Assets.Where(a => _cashManager.HasFile(a.Hash) is false).Select(a => { Debug.Log("not cash :" + a.Path + "-" + a.Hash); return a.Path; }).ToArray();
                 if (missing.Length is not 0) { return new BuildRequestResult.MissingAssets(missing); }
 
                 EnQueue(buildRequest);
@@ -273,16 +270,25 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
         {
             await Task.WhenAll(assets.Where(a =>
                             {
-                                if (_serverInstance._cashManager.HasFile(a.Hash))
+                                if (_serverInstance._cashManager.HasFile(a.Hash) is false)
                                 {
                                     Debug.LogWarning("not fount " + a.Hash + ":" + a.Path); return false;
                                 }
                                 return true;
                             }
                         ).Select(async a =>
-                            await File.WriteAllBytesAsync(Path.Combine(destPath, a.Path), await _serverInstance._cashManager.GetFile(a.Hash))
+                          await WriteFile(Path.Combine(destPath, a.Path), await _serverInstance._cashManager.GetFile(a.Hash))
                         )
             );
+        }
+        private static async Task WriteFile(string path, byte[] fileBytes)
+        {
+            var parentDirectory = new DirectoryInfo(path).Parent!.FullName;
+            try { if (Directory.Exists(parentDirectory) is false) Directory.CreateDirectory(parentDirectory); }
+            catch (Exception e) { Console.WriteLine(e); }
+
+            Console.WriteLine("write ! : " + path);
+            await File.WriteAllBytesAsync(path, fileBytes);
         }
 
         private static async Task BuildToUploadFromGUID(IVRCSdkAvatarBuilderApi sdk, string guid)

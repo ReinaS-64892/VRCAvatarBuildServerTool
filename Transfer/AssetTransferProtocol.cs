@@ -16,17 +16,19 @@ namespace net.rs64.VRCAvatarBuildServerTool.Transfer
     public class BuildRequest
     {
         // Unity の GUID
-        public List<string> BuildTargets;
+        public List<string> BuildTargets = new();
 
         // .meta も packages も関係なくねじ込む想定
-        public List<PathToHash> Assets;
+        public List<PathToHash> Assets = new();
     }
+    [Serializable]
     public class PathToHash
     {
         public string Path;
         public string Hash;
     }
 
+    [Serializable]
     public class BuildRequestResponse
     {
         public string ResultCode;

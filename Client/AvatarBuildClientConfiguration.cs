@@ -18,7 +18,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
     internal class BuildServer
     {
         public bool Enable = true;
-        public string URL = "http://127.0.0.1:9505/";
+        public string URL = "http://127.0.0.1:8080/";
         public string ServerPasscodeHeader = "";
     }
 }

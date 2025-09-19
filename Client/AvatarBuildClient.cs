@@ -41,8 +41,6 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             var doID = Progress.Start("AvatarBuildClient-SentToBuild", "VRCAvatarBuildServerTool-BuildToServer");
             try
             {
-                var transferTargetFiles = FindPackages();
-
                 switch (Selection.activeObject)
                 {
                     default: { Debug.Log("Unknown Target"); return; }
@@ -59,7 +57,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
 
                             var sw = Stopwatch.StartNew();
                             var targetGUID = AssetDatabase.AssetPathToGUID(targetPath);
-                            transferTargetFiles.AddRange(GetDependenciesWithFiltered(targetPath).SelectMany(p => new[] { p, p + ".meta" }));
+                            var transferTargetFiles = GetDependenciesWithFiltered(targetPath).SelectMany(p => new[] { p, p + ".meta" }).ToList();
 
                             sw.Stop();
                             Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
@@ -129,13 +127,13 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             }
         }
 
-        private static List<string> FindPackages()
-        {
-            return Directory.EnumerateDirectories("Packages")
-            .SelectMany(p => Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories))
-            .Where(p => p.Contains("/.git/") is false) // git フォルダを省きます。
-            .ToList();
-        }
+        // private static List<string> FindPackages()
+        // {
+        //     return Directory.EnumerateDirectories("Packages")
+        //     .SelectMany(p => Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories))
+        //     .Where(p => p.Contains("/.git/") is false) // git フォルダを省きます。
+        //     .ToList();
+        // }
 
         public static async Task<string> GetHash(string filePath)
         {

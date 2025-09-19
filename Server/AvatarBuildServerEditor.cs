@@ -28,6 +28,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             using var ccs = new EditorGUI.ChangeCheckScope();
 
             EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.BuildServerListenAddress)));
+            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.ServerPasscode)));
             EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.ShowGUIToAutoStart)));
             if (AvatarBuildServer.IsServerStarted is false)
             {
