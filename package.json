@@ -2,6 +2,7 @@
   "name": "net.rs64.vrc-avatar-build-server-tool",
   "displayName": "VRChatAvatarBuildServerTool",
   "version": "0.0.0",
+  "license": "MIT",
   "unity": "2022.3",
   "description": "VRChat Avatar Build On Server!",
   "vpmDependencies": {
