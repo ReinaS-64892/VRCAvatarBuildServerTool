@@ -21,14 +21,13 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
         public static bool IsServerStarted => _serverInstance != null;
         public static void ServerStart()
         {
+            if (AvatarBuildServerConfiguration.instance.EnableServer is false) { Debug.Log("AvatarBuildServer is disabled"); return; }
             if (_serverInstance != null) { Debug.Log("Server is already started"); return; }
-            var address = AvatarBuildServerConfiguration.instance.BuildServerListenAddress;
-            var passCode = AvatarBuildServerConfiguration.instance.ServerPasscode;
             var mainThreadContext = SynchronizationContext.Current;
 
             EditorApplication.update += BuilderLoop;
 
-            _serverInstance = new(address, passCode, mainThreadContext);
+            _serverInstance = new(AvatarBuildServerConfiguration.instance, mainThreadContext);
         }
         public static void ServerExit()
         {
@@ -43,18 +42,21 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
 
             HttpListener _httpServer;
             private string _passCode;
+            private List<string> _presave;
             CancellationTokenSource _serverCancellationTokenSource;
 
             Task _listenTask;
             internal CacheFileManager _cashManager;
 
-            public BuildServerInstance(string address, string passCode, SynchronizationContext post)
+            public BuildServerInstance(AvatarBuildServerConfiguration config, SynchronizationContext post)
             {
-                _address = address;
+                _address = config.BuildServerListenAddress;
+                _passCode = config.ServerPasscode;
+                _presave = config.PresavePackageFolderName;
+
                 _postCtx = post;
                 _httpServer = new();
-                _httpServer.Prefixes.Add(address);
-                _passCode = passCode;
+                _httpServer.Prefixes.Add(_address);
 
                 _serverCancellationTokenSource = new();
 
@@ -151,8 +153,40 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                             ctx.Response.Close();
                             return;
                         }
+                    case "/PackageClear":
+                        {
+                            ctx.Response.StatusCode = 200;
+                            ctx.Response.Close();
+                            PackageClear();
+
+                            return;
+                        }
+                    case "/AddPackage":
+                        {
+                            var memStream = new MemoryStream((int)req.ContentLength64);
+                            await req.InputStream.CopyToAsync(memStream);
+
+                            ctx.Response.StatusCode = 200;
+                            ctx.Response.Close();
+
+                            using var zip = new ZipArchive(memStream, ZipArchiveMode.Read);
+                            if (zip.Entries.Any() is false) { return; }
+
+                            var e = zip.Entries.First();
+                            if (_presave.Any(p => e.FullName.StartsWith(p))) { return; }
+                            Debug.Log("file path : " + e.FullName.Split("/").FirstOrDefault());
+                            zip.ExtractToDirectory("Packages", true);
+
+                            return;
+                        }
 
                 }
+            }
+
+            internal void PackageClear()
+            {
+                foreach (var p in Directory.EnumerateDirectories("Packages").Select(p => Path.GetFileName(p)).Where(p => _presave.Contains(p) is false))
+                    Directory.Delete(Path.Combine("Packages", p), true);
             }
 
             private BuildRequestResult BuildRequestRun(string jsonString)
@@ -345,6 +379,11 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                 await task.Task;
             }
             return APIUser.IsLoggedIn;
+        }
+
+        internal static void ClearPackageRequest()
+        {
+            _serverInstance?.PackageClear();
         }
     }
 }

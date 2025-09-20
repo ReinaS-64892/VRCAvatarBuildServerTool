@@ -1,4 +1,6 @@
+using System.Threading.Tasks;
 using UnityEditor;
+using UnityEngine;
 
 namespace net.rs64.VRCAvatarBuildServerTool.Client
 {
@@ -20,6 +22,12 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             using var ccs = new EditorGUI.ChangeCheckScope();
 
             EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildClientConfiguration.BuildServers)));
+            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildClientConfiguration.IgnorePackages)));
+
+            if (GUILayout.Button("Sync Packages"))
+            {
+                Task.Run(async () => await AvatarBuildClient.SyncPackages());
+            }
 
             if (ccs.changed)
             {

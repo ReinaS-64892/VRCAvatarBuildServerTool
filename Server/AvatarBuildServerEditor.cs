@@ -1,3 +1,5 @@
+using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -27,24 +29,43 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             sObj.Update();
             using var ccs = new EditorGUI.ChangeCheckScope();
 
-            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.BuildServerListenAddress)));
-            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.ServerPasscode)));
-            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.ShowGUIToAutoStart)));
-            if (AvatarBuildServer.IsServerStarted is false)
+            var isEnable = sObj.FindProperty(nameof(AvatarBuildServerConfiguration.EnableServer));
+            EditorGUILayout.PropertyField(isEnable);
+            if (isEnable.boolValue)
             {
-                if (GUILayout.Button("server start"))
+                EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.BuildServerListenAddress)));
+                EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.ServerPasscode)));
+                EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.ShowGUIToAutoStart)));
+                if (AvatarBuildServer.IsServerStarted is false)
                 {
-                    AvatarBuildServer.ServerStart();
+                    if (GUILayout.Button("server start"))
+                    {
+                        AvatarBuildServer.ServerStart();
+                    }
+                }
+                else
+                {
+                    if (GUILayout.Button("exit server"))
+                    {
+                        AvatarBuildServer.ServerExit();
+                    }
+                }
+                EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.PresavePackageFolderName)));
+                if (GUILayout.Button("set now packages"))
+                {
+                    AvatarBuildServer.ServerExit();
+                    AvatarBuildServerConfiguration.instance.PresavePackageFolderName = new(Directory.EnumerateDirectories("Packages").Select(p => p.Substring("Packages/".Length)));
+                    AvatarBuildServerConfiguration.instance.Save();
+                }
+                if (GUILayout.Button("Clear package"))
+                {
+                    AvatarBuildServer.ClearPackageRequest();
                 }
             }
             else
             {
-                if (GUILayout.Button("exit server"))
-                {
-                    AvatarBuildServer.ServerExit();
-                }
+                if (AvatarBuildServer.IsServerStarted) { AvatarBuildServer.ServerExit(); }
             }
-
             if (ccs.changed)
             {
                 sObj.ApplyModifiedProperties();
