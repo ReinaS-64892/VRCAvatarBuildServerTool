@@ -20,6 +20,8 @@ __それができないのであれば、このツールを使うに足りうる
 
 また、VRChat SDK の規約的に怪しいですが、楽をしたいのであれば [Auto Certify Copyright Agreement](https://github.com/Rerigferl/auto-certify-copyright-agreement) を同時に VPM からインストールしておくと Server として使いやすくなります。(私はこれに関して何ら責任を取れないので、自己責任で(そもそもこのレポジトリも MIT License ですし ...))
 
+さいごに、 EnableServer を true にした後 サーバー スタートボタンを押すことでサーバーとして動く ... ! (次回以降は gui の表示と同時に動作するようになるよ！)
+
 ### Client
 
 人によっては[下記参照](#textranstool--linux--nvidia-gpuユーザー向け情報)。
