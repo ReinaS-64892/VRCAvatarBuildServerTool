@@ -21,6 +21,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
         public static bool IsServerStarted => _serverInstance != null;
         public static void ServerStart()
         {
+            if (AvatarBuildServerConfiguration.instance.EnableServer is false) { Debug.Log("AvatarBuildServer is disabled"); return; }
             if (_serverInstance != null) { Debug.Log("Server is already started"); return; }
             var mainThreadContext = SynchronizationContext.Current;
 
@@ -156,9 +157,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                         {
                             ctx.Response.StatusCode = 200;
                             ctx.Response.Close();
-
-                            foreach (var p in Directory.EnumerateDirectories("Packages").Select(p => Path.GetFileName(p)).Where(p => _presave.Contains(p)))
-                                Directory.Delete(Path.Combine("Packages", p), true);
+                            PackageClear();
 
                             return;
                         }
@@ -167,18 +166,27 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                             var memStream = new MemoryStream((int)req.ContentLength64);
                             await req.InputStream.CopyToAsync(memStream);
 
+                            ctx.Response.StatusCode = 200;
+                            ctx.Response.Close();
+
                             using var zip = new ZipArchive(memStream, ZipArchiveMode.Read);
                             if (zip.Entries.Any() is false) { return; }
 
                             var e = zip.Entries.First();
                             if (_presave.Any(p => e.FullName.StartsWith(p))) { return; }
-
+                            Debug.Log("file path : " + e.FullName.Split("/").FirstOrDefault());
                             zip.ExtractToDirectory("Packages", true);
 
                             return;
                         }
 
                 }
+            }
+
+            internal void PackageClear()
+            {
+                foreach (var p in Directory.EnumerateDirectories("Packages").Select(p => Path.GetFileName(p)).Where(p => _presave.Contains(p) is false))
+                    Directory.Delete(Path.Combine("Packages", p), true);
             }
 
             private BuildRequestResult BuildRequestRun(string jsonString)
@@ -371,6 +379,11 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                 await task.Task;
             }
             return APIUser.IsLoggedIn;
+        }
+
+        internal static void ClearPackageRequest()
+        {
+            _serverInstance?.PackageClear();
         }
     }
 }

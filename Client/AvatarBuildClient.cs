@@ -179,7 +179,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                 var buildURI = new Uri(server.URL + "Build");
                 var fileURI = new Uri(server.URL + "File");
 
-                PrepareHTTPClient(server);
+                PrepareHTTPClient(server); if (_client is null) { throw new Exception(); }
 
                 var transferBytes = 0L;
                 for (var i = 0; 4 > i; i += 1)//とりあえず safety として 4回
@@ -304,11 +304,14 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
 
         internal static async Task SyncPackages()
         {
-            try
+            _BuildTargetServers = AvatarBuildClientConfiguration.instance.BuildServers;
+            var ignorePackage = AvatarBuildClientConfiguration.instance.IgnorePackages;
+            var packagesPathStringLen = "Packages/".Length;
+            foreach (var server in _BuildTargetServers!)
             {
-                _BuildTargetServers = AvatarBuildClientConfiguration.instance.BuildServers;
-                var packagesPathStringLen = "Packages/".Length;
-                foreach (var server in _BuildTargetServers!)
+                var pID = Progress.Start("SyncPackages");
+                Progress.Report(pID, 0);
+                try
                 {
                     if (server.Enable is false) { continue; }
                     PrepareHTTPClient(server);
@@ -321,22 +324,54 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                     if (clearReq.IsSuccessStatusCode is false) { Debug.Log("Package Clear filed!"); continue; }
                     Debug.Log("Package Clear");
 
-                    foreach (var package in Directory.EnumerateDirectories("Packages"))
+                    var task = Directory.GetDirectories("Packages")
+                        .Where(p => ignorePackage.Any(i => p.Substring(packagesPathStringLen) == i) is false)
+                        .Select(
+                        async package =>
+                        {
+                            var cpID = Progress.Start("Sync " + package, "", Progress.Options.None, pID);
+                            using var memStream = new MemoryStream();
+
+                            using (var zip = new ZipArchive(memStream, ZipArchiveMode.Create))
+                            {
+                                var files = Directory.GetFiles(package, "*", SearchOption.AllDirectories);
+                                for (var i = 0; files.Length > i; i += 1)
+                                {
+                                    Progress.Report(cpID, i / (float)files.Length);
+                                    var f = files[i];
+
+                                    try
+                                    {
+                                        var entry = zip.CreateEntry(f.Substring(packagesPathStringLen), System.IO.Compression.CompressionLevel.Optimal);
+                                        using var entryWriter = entry.Open();
+                                        using var fo = File.OpenRead(f);
+                                        await fo.CopyToAsync(entryWriter);
+                                    }
+                                    catch (Exception e) { Debug.LogWarning(e); }// 握りつぶそうね ... ! めんどいから
+                                }
+                            }
+                            Progress.Finish(cpID);
+                            return memStream.ToArray();
+                        }
+                    );
+                    var postCandidate = await Task.WhenAll(task);
+                    for (var i = 0; postCandidate.Length > i; i += 1)
                     {
-                        using var memStream = new MemoryStream();
-
-                        using (var zip = new ZipArchive(memStream, ZipArchiveMode.Create))
-                            foreach (var f in Directory.EnumerateFiles(package, "", SearchOption.AllDirectories))
-                                zip.CreateEntryFromFile(f, f.Substring(packagesPathStringLen), System.IO.Compression.CompressionLevel.Optimal);
-
-                        using var content = new ByteArrayContent(memStream.ToArray());
+                        Progress.Report(pID, i / (float)postCandidate.Length);
+                        var packageZip = postCandidate[i];
+                        using var content = new ByteArrayContent(packageZip);
                         var addReq = await _client.PostAsync(addURI, content);
-                        if (addReq.IsSuccessStatusCode is false) { Debug.Log("Add failed : " + package); continue; }
-                        Debug.Log("Sync to server : " + package);
+                        if (addReq.IsSuccessStatusCode is false) { Debug.Log("Add failed"); continue; }
                     }
                 }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                    Progress.Finish(pID, Progress.Status.Failed);
+                }
+                Progress.Finish(pID);
+                Debug.Log("Sync exit");
             }
-            catch (Exception e) { Debug.LogException(e); }
         }
     }
 }

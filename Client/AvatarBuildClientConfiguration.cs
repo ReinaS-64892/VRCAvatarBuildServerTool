@@ -9,6 +9,9 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
     internal sealed class AvatarBuildClientConfiguration : ScriptableSingleton<AvatarBuildClientConfiguration>
     {
         public List<BuildServer> BuildServers = new List<BuildServer>() { new() };
+
+        public List<string> IgnorePackages = new();
+
         internal void Save()
         {
             Save(true);
