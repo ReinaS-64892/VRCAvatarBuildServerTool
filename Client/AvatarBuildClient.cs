@@ -13,6 +13,8 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using net.rs64.VRCAvatarBuildServerTool.Transfer;
+using System.IO.Compression;
+
 
 
 
@@ -177,9 +179,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                 var buildURI = new Uri(server.URL + "Build");
                 var fileURI = new Uri(server.URL + "File");
 
-                _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(360) };
-                if (_client.DefaultRequestHeaders.Contains("Authorization")) _client.DefaultRequestHeaders.Remove("Authorization");
-                _client.DefaultRequestHeaders.Add("Authorization", server.ServerPasscodeHeader);
+                PrepareHTTPClient(server);
 
                 var transferBytes = 0L;
                 for (var i = 0; 4 > i; i += 1)//とりあえず safety として 4回
@@ -205,13 +205,13 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                                 {
                                     Debug.Log("MissingAssets!");
                                     var filePostTask = requestResponse.MissingFiles.Select(async f =>
-                                        {
-                                            var bytes = await File.ReadAllBytesAsync(f);
-                                            using var fileBytesContents = new ByteArrayContent(bytes);
-                                            var res = await _client.PostAsync(fileURI, fileBytesContents);
-                                            Debug.Log("File POST:" + res.StatusCode + " - " + f);
-                                            Interlocked.Add(ref transferBytes, bytes.LongLength);
-                                        }
+                                    {
+                                        var bytes = await File.ReadAllBytesAsync(f);
+                                        using var fileBytesContents = new ByteArrayContent(bytes);
+                                        var res = await _client.PostAsync(fileURI, fileBytesContents);
+                                        Debug.Log("File POST:" + res.StatusCode + " - " + f);
+                                        Interlocked.Add(ref transferBytes, bytes.LongLength);
+                                    }
                                     ).ToArray();
                                     await Task.WhenAll(filePostTask);
                                     break;
@@ -228,6 +228,13 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
 
                 Debug.Log("file transferer size for:" + transferBytes / (1024.0 * 1024.0) + "mb");
             }
+        }
+
+        private static void PrepareHTTPClient(BuildServer server)
+        {
+            _client ??= new HttpClient() { Timeout = TimeSpan.FromSeconds(360) };
+            if (_client.DefaultRequestHeaders.Contains("Authorization")) _client.DefaultRequestHeaders.Remove("Authorization");
+            _client.DefaultRequestHeaders.Add("Authorization", server.ServerPasscodeHeader);
         }
 
 #if CAU
@@ -293,6 +300,43 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             return AssetDatabase.GetDependencies(targetPrefabPath)
             .Where(path => path.StartsWith("Packages") is false || path.StartsWith("Packages/nadena.dev.ndmf/__Generated"))
             .ToArray();
+        }
+
+        internal static async Task SyncPackages()
+        {
+            try
+            {
+                _BuildTargetServers = AvatarBuildClientConfiguration.instance.BuildServers;
+                var packagesPathStringLen = "Packages/".Length;
+                foreach (var server in _BuildTargetServers!)
+                {
+                    if (server.Enable is false) { continue; }
+                    PrepareHTTPClient(server);
+                    if (_client is null) { throw new Exception(); }
+
+                    var clearURI = new Uri(server.URL + "PackageClear");
+                    var addURI = new Uri(server.URL + "AddPackage");
+
+                    var clearReq = await _client.PostAsync(clearURI, new ByteArrayContent(Array.Empty<byte>()));
+                    if (clearReq.IsSuccessStatusCode is false) { Debug.Log("Package Clear filed!"); continue; }
+                    Debug.Log("Package Clear");
+
+                    foreach (var package in Directory.EnumerateDirectories("Packages"))
+                    {
+                        using var memStream = new MemoryStream();
+
+                        using (var zip = new ZipArchive(memStream, ZipArchiveMode.Create))
+                            foreach (var f in Directory.EnumerateFiles(package, "", SearchOption.AllDirectories))
+                                zip.CreateEntryFromFile(f, f.Substring(packagesPathStringLen), System.IO.Compression.CompressionLevel.Optimal);
+
+                        using var content = new ByteArrayContent(memStream.ToArray());
+                        var addReq = await _client.PostAsync(addURI, content);
+                        if (addReq.IsSuccessStatusCode is false) { Debug.Log("Add failed : " + package); continue; }
+                        Debug.Log("Sync to server : " + package);
+                    }
+                }
+            }
+            catch (Exception e) { Debug.LogException(e); }
         }
     }
 }

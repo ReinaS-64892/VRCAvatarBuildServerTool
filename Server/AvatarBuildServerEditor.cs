@@ -1,3 +1,5 @@
+using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -44,7 +46,13 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                     AvatarBuildServer.ServerExit();
                 }
             }
-
+            EditorGUILayout.PropertyField(sObj.FindProperty(nameof(AvatarBuildServerConfiguration.PresavePackageFolderName)));
+            if (GUILayout.Button("set now packages"))
+            {
+                AvatarBuildServer.ServerExit();
+                AvatarBuildServerConfiguration.instance.PresavePackageFolderName = new(Directory.EnumerateDirectories("Packages").Select(p => p.Substring("Packages/".Length)));
+                AvatarBuildServerConfiguration.instance.Save();
+            }
             if (ccs.changed)
             {
                 sObj.ApplyModifiedProperties();
