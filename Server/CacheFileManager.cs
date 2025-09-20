@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 namespace net.rs64.VRCAvatarBuildServerTool.Server
 {
 
-    public class CashFileManager
+    public class CacheFileManager
     {
         private string _directory;
 
-        public CashFileManager(string directory)
+        public CacheFileManager(string directory)
         {
             _directory = directory;
             if (Directory.Exists(_directory) is false) { Directory.CreateDirectory(_directory); }

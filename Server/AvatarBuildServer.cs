@@ -46,7 +46,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             CancellationTokenSource _serverCancellationTokenSource;
 
             Task _listenTask;
-            internal CashFileManager _cashManager;
+            internal CacheFileManager _cashManager;
 
             public BuildServerInstance(string address, string passCode, SynchronizationContext post)
             {
@@ -59,7 +59,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
                 _serverCancellationTokenSource = new();
 
                 _listenTask = Task.Run(() => Loop(_serverCancellationTokenSource.Token));
-                _cashManager = new CashFileManager(Path.GetFullPath("Library/VRCAvatarBuildServerCash"));
+                _cashManager = new CacheFileManager(Path.GetFullPath("Library/VRCAvatarBuildServerCash"));
             }
 
 
