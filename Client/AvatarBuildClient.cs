@@ -368,9 +368,13 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                 {
                     Debug.LogException(e);
                     Progress.Finish(pID, Progress.Status.Failed);
+                    pID = -1;
                 }
-                Progress.Finish(pID);
-                Debug.Log("Sync exit");
+                finally
+                {
+                    Progress.Finish(pID);
+                    Debug.Log("Sync exit");
+                }
             }
         }
     }
