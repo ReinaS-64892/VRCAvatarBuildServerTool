@@ -84,41 +84,40 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                             return;
                         }
 #if CAU
-                        // case AvatarUploadSettingOrGroup aus:
-                        //     {
-                        //         Progress.Report(doID, 0f, "GetPrefabs from cAU");
-                        //         var targetAvatarRoots = GetPrefabFromCAU(aus);
+                    case AvatarUploadSettingOrGroup aus:
+                        {
+                            Progress.Report(doID, 0f, "GetPrefabs from cAU");
+                            var targetAvatarRoots = GetPrefabFromCAU(aus);
 
-                        //         Progress.Report(doID, 0.1f, "CloneAndBuildToAsset");
-                        //         var targetPaths = targetAvatarRoots.Select(i => CloneAndBuildToAsset(i, clientSideNDMFExecution)).ToArray();
+                            Progress.Report(doID, 0.1f, "CloneAndBuildToAsset");
+                            var targetPaths = targetAvatarRoots.Select(i => CloneAndBuildToAsset(i, clientSideNDMFExecution)).ToArray();
 
-                        //         Progress.Report(doID, 0.7f, "Post data prepare");
-                        //         var sw = Stopwatch.StartNew();
+                            Progress.Report(doID, 0.7f, "Post data prepare");
+                            var sw = Stopwatch.StartNew();
 
-                        //         var targetGUIDs = targetPaths.Select(AssetDatabase.AssetPathToGUID);
-                        //         var transferAssets = GetDependenciesWithFiltered(targetPaths);
+                            var targetGUIDs = targetPaths.Select(AssetDatabase.AssetPathToGUID).ToList();
+                            var transferTargetFiles = GetDependenciesWithFiltered(targetPaths).SelectMany(p => new[] { p, p + ".meta" }).ToList();
 
-                        //         sw.Stop();
-                        //         Progress.Report(doID, 0.8f, "Encode Assets");
-                        //         Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
-                        //         try
-                        //         {
-                        //             sw.Restart();
-                        //             var internalBinary = await AssetTransferProtocol.EncodeAssetsAndTargetGUID(transferAssets, targetGUIDs);
-                        //             sw.Stop();
-                        //             Debug.Log("EncodeAssets:" + sw.ElapsedMilliseconds + "ms");
-                        //             Progress.Report(doID, 0.95f, "POST");
-                        //             await PostInternalBinary(internalBinary);
-                        //         }
-                        //         finally
-                        //         {
-                        //             foreach (var targetPath in targetPaths) AssetDatabase.DeleteAsset(targetPath);
-                        //             Progress.Report(doID, 1f, "Exit");
-                        //         }
-                        //         Debug.Log("Exit Build transfer");
-                        //         Progress.Finish(doID, Progress.Status.Succeeded);
-                        //         return;
-                        //     }
+                            sw.Stop();
+                            Progress.Report(doID, 0.8f, "Encode Assets");
+                            Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
+                            try
+                            {
+                                sw.Restart();
+                                await Task.Run(() => SendBuildRun(targetGUIDs, transferTargetFiles));
+                                sw.Stop();
+                                Debug.Log("Build Sending :" + sw.ElapsedMilliseconds + "ms");
+                                Progress.Report(doID, 0.95f, "Exiting");
+                            }
+                            finally
+                            {
+                                foreach (var targetPath in targetPaths) AssetDatabase.DeleteAsset(targetPath);
+                                Progress.Report(doID, 1f, "Exit");
+                            }
+                            Debug.Log("Exit Build transfer");
+                            Progress.Finish(doID, Progress.Status.Succeeded);
+                            return;
+                        }
 #endif
                 }
             }
