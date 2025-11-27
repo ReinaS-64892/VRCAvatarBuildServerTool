@@ -104,6 +104,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                             try
                             {
                                 sw.Restart();
+                                _BuildTargetServers = AvatarBuildClientConfiguration.instance.BuildServers;
                                 await Task.Run(() => SendBuildRun(targetGUIDs, transferTargetFiles));
                                 sw.Stop();
                                 Debug.Log("Build Sending :" + sw.ElapsedMilliseconds + "ms");
