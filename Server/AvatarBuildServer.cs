@@ -49,8 +49,24 @@ public partial class AvatarBuildServer
 
         var buildWorkerManageTask = Task.Run(async () => await BuildWorkerManager(channel.Reader, _cancellationTokenSource.Token));
         var httpServerTask = Task.Run(async () => await HttpServerLoop(channel.Writer, _cancellationTokenSource.Token));
-
-        await buildWorkerManageTask;
+        while (true)
+        {
+            var k = Console.ReadKey();
+            switch (k.KeyChar)
+            {
+                default: break;
+                case 's':
+                    {
+                        StatusRequested = true;
+                        break;
+                    }
+                case 'q':
+                    {
+                        _cancellationTokenSource.Cancel();
+                        return;
+                    }
+            }
+        }
     }
     static bool CopyDirectory(string source, string destination)
     {

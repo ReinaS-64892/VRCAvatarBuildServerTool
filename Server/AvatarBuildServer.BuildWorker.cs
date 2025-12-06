@@ -12,6 +12,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server;
 
 public partial class AvatarBuildServer
 {
+    private bool StatusRequested;
 
     class WorkerRun
     {
@@ -64,7 +65,8 @@ public partial class AvatarBuildServer
             }
             CopyDirectory(UnityBuildRunnerPath, Path.Combine(packages, "AvatarBuildRunner"));
 
-            File.WriteAllText(Path.Combine(projectPath, "BuildTask"), buildRequest.BuildTarget);
+            var runnerReq = new RunnerRequest() { ParentServerURL = config.ListenAddress.First(), TargetGUID = buildRequest.BuildTarget };
+            File.WriteAllText(Path.Combine(projectPath, "BuildTask"), JsonSerializer.Serialize(runnerReq));
 
             _process = Process.Start(new ProcessStartInfo(
                 config.UnityEditor,
@@ -166,6 +168,7 @@ public partial class AvatarBuildServer
                 }
                 if (MayDoBuildRequest()) { ShowStatus(); }
                 else { await Task.Delay(100); }
+                if (StatusRequested) { StatusRequested = false; ShowStatus(); }
             }
 
         }
@@ -177,11 +180,6 @@ public partial class AvatarBuildServer
         finally
         {
             foreach (var p in workers.Values) { p?.MayKill(); }
-            foreach (var projectPath in workers.Keys)
-            {
-                if (Directory.Exists(projectPath) is false) { continue; }
-                Directory.Delete(projectPath, true);
-            }
         }
     }
 
