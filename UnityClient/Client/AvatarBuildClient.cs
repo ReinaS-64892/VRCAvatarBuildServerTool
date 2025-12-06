@@ -139,56 +139,55 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                 .Append("net.rs64.vrc-avatar-build-server-tool.unity-build-runner")
                 .ToList();
 
-            var task = Directory.GetDirectories("Packages")
-                .Select(pkg => Task.Run(async () =>
-                {
-                    var parentDir = pkg;// exsample "Packages/TexTransTool"
+            if (PackageCache is null)
+            {
 
-                    var pkjJson = Path.Combine(parentDir, "package.json");
-                    if (File.Exists(pkjJson) is false) { return null; }
-                    var pkjNameID = JsonUtility.FromJson<PackageJson>(File.ReadAllText(pkjJson)).name;
-                    if (string.IsNullOrWhiteSpace(pkjNameID)) { return null; }
-                    if (ingorePackageID.Contains(pkjNameID)) { return null; }
+                var task = Directory.GetDirectories("Packages")
+                    .Select(pkg => Task.Run(async () =>
+                    {
+                        var parentDir = pkg;// exsample "Packages/TexTransTool"
 
-                    var fileTask = Directory.GetFiles(pkg, "*", SearchOption.AllDirectories)
-                        .Select(p =>
-                        {
-                            // exsample p "Packages/TexTransTool/package.json"
-                            return Task.Run(async () =>
+                        var pkjJson = Path.Combine(parentDir, "package.json");
+                        if (File.Exists(pkjJson) is false) { return null; }
+                        var pkjNameID = JsonUtility.FromJson<PackageJson>(File.ReadAllText(pkjJson)).name;
+                        if (string.IsNullOrWhiteSpace(pkjNameID)) { return null; }
+                        if (ingorePackageID.Contains(pkjNameID)) { return null; }
+
+                        var fileTask = Directory.GetFiles(pkg, "*", SearchOption.AllDirectories)
+                            .Select(p =>
                             {
-                                if (p.Contains("/.git/")) { return null; }// .git は特別に無視します。
-                                try
+                                // exsample p "Packages/TexTransTool/package.json"
+                                return Task.Run(async () =>
                                 {
-                                    return new PathToHash() { Path = p, Hash = await GetHash(p) };
+                                    if (p.Contains("/.git/")) { return null; }// .git は特別に無視します。
+                                    try
+                                    {
+                                        return new PathToHash() { Path = p, Hash = await GetHash(p) };
+                                    }
+                                    catch // 壊れた symlink などを無視するために握りつぶし！！！
+                                    {
+                                        return null;
+                                    }
                                 }
-                                catch // 壊れた symlink などを無視するために握りつぶし！！！
-                                {
-                                    return null;
-                                }
-                            }
-                            );
-                        });
-                    var files = (await Task.WhenAll(fileTask)).OfType<PathToHash>().ToArray();
-                    return new Package() { PackageID = pkjNameID, Files = files };
-                }
-                )
-            );
-            req.Packages = (await Task.WhenAll(task)).OfType<Package>().ToArray();
+                                );
+                            });
+                        var files = (await Task.WhenAll(fileTask)).OfType<PathToHash>().ToArray();
+                        return new Package() { PackageID = pkjNameID, Files = files };
+                    }
+                    )
+                );
+                req.Packages = PackageCache = (await Task.WhenAll(task)).OfType<Package>().ToArray();
+            }
+            else { req.Packages = PackageCache; }
+
             return req;
         }
+        // くそざつキャッシング 何もしてないのでドメインリロードで破棄されるから問題なし。
+        static Package[]? PackageCache = null;
         class PackageJson
         {
             public string name = "";
         }
-
-        // private static List<string> FindPackages()
-        // {
-        //     return Directory.EnumerateDirectories("Packages")
-        //     .SelectMany(p => Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories))
-        //     .Where(p => p.Contains("/.git/") is false) // git フォルダを省きます。
-        //     .ToList();
-        // }
-
         public static async Task<string> GetHash(string filePath)
         {
             // SHA1 はスレッドセーフではない
