@@ -9,23 +9,32 @@ using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
-namespace net.rs64.VRCAvatarBuildServerTool.Transfer
+namespace net.rs64.VRCAvatarBuildServerTool.Client
 {
     // Protocol
     [Serializable]
     public class BuildRequest
     {
+        public string PrefabName = "";
         // Unity の GUID
-        public List<string> BuildTargets = new();
+        public string BuildTarget = "";
 
-        // .meta も packages も関係なくねじ込む想定
-        public List<PathToHash> Assets = new();
+        public PathToHash[] Assets = Array.Empty<PathToHash>();
+        public Package[] Packages = Array.Empty<Package>();
     }
     [Serializable]
     public class PathToHash
     {
         public string Path;
         public string Hash;
+    }
+    [Serializable]
+    public class Package
+    {
+        public string PackageID;
+
+        // パスは package 内の相対にしたいね
+        public PathToHash[] Files = Array.Empty<PathToHash>();
     }
 
     [Serializable]

@@ -10,7 +10,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
     {
         public List<BuildServer> BuildServers = new List<BuildServer>() { new() };
 
-        public List<string> IgnorePackages = new();
+        public List<string> IgnorePackageIDs = new();
 
         internal void Save()
         {

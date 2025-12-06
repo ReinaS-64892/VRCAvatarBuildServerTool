@@ -12,7 +12,6 @@ using System.Security.Cryptography;
 using System.IO;
 using System.Text;
 using System.Threading;
-using net.rs64.VRCAvatarBuildServerTool.Transfer;
 using System.IO.Compression;
 
 
@@ -29,7 +28,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
     public static class AvatarBuildClient
     {
         static HttpClient? _client;
-        private static List<BuildServer>? _BuildTargetServers;
+        private static AvatarBuildClientConfiguration? _config;
 
         [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer")]
         [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer")]
@@ -40,6 +39,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
         public static void ClientSideNDMFManualBakeToDo() { DoImpl(true); }
         public static async void DoImpl(bool clientSideNDMFExecution = false)
         {
+            _config = AvatarBuildClientConfiguration.instance;
             var doID = Progress.Start("AvatarBuildClient-SentToBuild", "VRCAvatarBuildServerTool-BuildToServer");
             try
             {
@@ -54,22 +54,17 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                             Progress.Report(doID, 0f, "CloneAndBuildToAsset");
 
                             var targetPath = CloneAndBuildToAsset(avatarRoot, clientSideNDMFExecution);
-
-                            Progress.Report(doID, 0.1f, "Post data search");
-
-                            var sw = Stopwatch.StartNew();
-                            var targetGUID = AssetDatabase.AssetPathToGUID(targetPath);
-                            var transferTargetFiles = GetDependenciesWithFiltered(targetPath).SelectMany(p => new[] { p, p + ".meta" }).ToList();
-
-                            sw.Stop();
-                            Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
-                            Progress.Report(doID, 0.2f, "Build Sending");
-
                             try
                             {
+                                Progress.Report(doID, 0.1f, "make build request");
+                                var sw = Stopwatch.StartNew();
+                                var buildRequest = await CreateBuildRequest(avatarRoot.name, targetPath);
+                                sw.Stop();
+                                Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
+                                Progress.Report(doID, 0.2f, "Build Sending");
+
                                 sw.Restart();
-                                _BuildTargetServers = AvatarBuildClientConfiguration.instance.BuildServers;
-                                await Task.Run(() => SendBuildRun(new() { targetGUID }, transferTargetFiles));
+                                await Task.Run(() => SendBuild(buildRequest));
                                 sw.Stop();
                                 Debug.Log("Build Sending :" + sw.ElapsedMilliseconds + "ms");
                                 Progress.Report(doID, 0.95f, "Exiting");
@@ -90,29 +85,27 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                             var targetAvatarRoots = GetPrefabFromCAU(aus);
 
                             Progress.Report(doID, 0.1f, "CloneAndBuildToAsset");
-                            var targetPaths = targetAvatarRoots.Select(i => CloneAndBuildToAsset(i, clientSideNDMFExecution)).ToArray();
-
-                            Progress.Report(doID, 0.7f, "Post data prepare");
-                            var sw = Stopwatch.StartNew();
-
-                            var targetGUIDs = targetPaths.Select(AssetDatabase.AssetPathToGUID).ToList();
-                            var transferTargetFiles = GetDependenciesWithFiltered(targetPaths).SelectMany(p => new[] { p, p + ".meta" }).ToList();
-
-                            sw.Stop();
-                            Progress.Report(doID, 0.8f, "Encode Assets");
-                            Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
+                            var targetNameAndPaths = targetAvatarRoots.Select(i => (i.name, CloneAndBuildToAsset(i, clientSideNDMFExecution))).ToArray();
                             try
                             {
+                                Progress.Report(doID, 0.7f, "Post data prepare");
+                                var sw = Stopwatch.StartNew();
+                                var buildRequests = await Task.WhenAll(targetNameAndPaths.Select(t => Task.Run(async () => await CreateBuildRequest(t.name, t.Item2))));
+                                sw.Stop();
+                                Progress.Report(doID, 0.8f, "Encode Assets");
+                                Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
                                 sw.Restart();
-                                _BuildTargetServers = AvatarBuildClientConfiguration.instance.BuildServers;
-                                await Task.Run(() => SendBuildRun(targetGUIDs, transferTargetFiles));
+                                foreach (var buildRequest in buildRequests)
+                                {
+                                    await Task.Run(() => SendBuild(buildRequest));
+                                }
                                 sw.Stop();
                                 Debug.Log("Build Sending :" + sw.ElapsedMilliseconds + "ms");
                                 Progress.Report(doID, 0.95f, "Exiting");
                             }
                             finally
                             {
-                                foreach (var targetPath in targetPaths) AssetDatabase.DeleteAsset(targetPath);
+                                foreach (var targetPath in targetNameAndPaths) AssetDatabase.DeleteAsset(targetPath.Item2);
                                 Progress.Report(doID, 1f, "Exit");
                             }
                             Debug.Log("Exit Build transfer");
@@ -127,6 +120,65 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                 Progress.Finish(doID, Progress.Status.Failed);
                 throw e;
             }
+        }
+
+        public static async Task<BuildRequest> CreateBuildRequest(string prefabName, string prefabPath)
+        {
+            var targetGUID = AssetDatabase.AssetPathToGUID(prefabPath);
+            var transferTargetFiles = GetDependenciesWithFiltered(prefabPath).SelectMany(p => new[] { p, p + ".meta" }).ToList();
+
+            var req = new BuildRequest();
+            req.PrefabName = prefabName;
+            req.BuildTarget = targetGUID;
+
+            var targetFileHashesKv = await Task.WhenAll(transferTargetFiles.Select(p => Task.Run(async () => new PathToHash() { Path = p, Hash = await GetHash(p) })));
+            req.Assets = targetFileHashesKv;
+
+            var ingorePackageID = (_config?.IgnorePackageIDs ?? Enumerable.Empty<string>())
+                .Append("net.rs64.vrc-avatar-build-server-tool.unity-client")
+                .Append("net.rs64.vrc-avatar-build-server-tool.unity-build-runner")
+                .ToList();
+
+            var task = Directory.GetDirectories("Packages")
+                .Select(pkg => Task.Run(async () =>
+                {
+                    var parentDir = pkg;// exsample "Packages/TexTransTool"
+
+                    var pkjJson = Path.Combine(parentDir, "package.json");
+                    if (File.Exists(pkjJson) is false) { return null; }
+                    var pkjNameID = JsonUtility.FromJson<PackageJson>(File.ReadAllText(pkjJson)).name;
+                    if (string.IsNullOrWhiteSpace(pkjNameID)) { return null; }
+                    if (ingorePackageID.Contains(pkjNameID)) { return null; }
+
+                    var fileTask = Directory.GetFiles(pkg, "*", SearchOption.AllDirectories)
+                        .Select(p =>
+                        {
+                            // exsample p "Packages/TexTransTool/package.json"
+                            return Task.Run(async () =>
+                            {
+                                if (p.Contains("/.git/")) { return null; }// .git は特別に無視します。
+                                try
+                                {
+                                    return new PathToHash() { Path = p, Hash = await GetHash(p) };
+                                }
+                                catch // 壊れた symlink などを無視するために握りつぶし！！！
+                                {
+                                    return null;
+                                }
+                            }
+                            );
+                        });
+                    var files = (await Task.WhenAll(fileTask)).OfType<PathToHash>().ToArray();
+                    return new Package() { PackageID = pkjNameID, Files = files };
+                }
+                )
+            );
+            req.Packages = (await Task.WhenAll(task)).OfType<Package>().ToArray();
+            return req;
+        }
+        class PackageJson
+        {
+            public string name = "";
         }
 
         // private static List<string> FindPackages()
@@ -144,35 +196,13 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             var hash = sha.ComputeHash(await File.ReadAllBytesAsync(filePath));
             return Convert.ToBase64String(hash);
         }
-        private static async Task SendBuildRun(List<string> targets, List<string> targetFiles)
+        private static async Task SendBuild(BuildRequest buildRequest)
         {
-            try
-            {
-                await SendBuild(targets, targetFiles);
-            }
-            catch (Exception e)
-            {
-                Debug.LogException(e);
-            }
-        }
-        private static async Task SendBuild(List<string> targets, List<string> targetFiles)
-        {
-            var targetFileHashesKv = await Task.WhenAll(
-                targetFiles.Select(
-                    f => Task.Run(async () => new PathToHash()
-                    {
-                        Path = f,
-                        Hash = await GetHash(f)
-                    }
-                    )
-                )
-            );
-            var buildRequest = new BuildRequest() { BuildTargets = targets, Assets = targetFileHashesKv.ToList() };
             var buildRequestJson = JsonUtility.ToJson(buildRequest);
             var buildRequestBytes = Encoding.UTF8.GetBytes(buildRequestJson);
             using var buildRequestBinaryContent = new ByteArrayContent(buildRequestBytes);
 
-            foreach (var server in _BuildTargetServers!)
+            foreach (var server in _config!.BuildServers)
             {
                 if (server.Enable is false) { continue; }
 
@@ -300,82 +330,6 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             return AssetDatabase.GetDependencies(targetPrefabPath)
             .Where(path => path.StartsWith("Packages") is false || path.StartsWith("Packages/nadena.dev.ndmf/__Generated"))
             .ToArray();
-        }
-
-        internal static async Task SyncPackages()
-        {
-            _BuildTargetServers = AvatarBuildClientConfiguration.instance.BuildServers;
-            var ignorePackage = AvatarBuildClientConfiguration.instance.IgnorePackages;
-            var packagesPathStringLen = "Packages/".Length;
-            foreach (var server in _BuildTargetServers!)
-            {
-                var pID = Progress.Start("SyncPackages");
-                Progress.Report(pID, 0);
-                try
-                {
-                    if (server.Enable is false) { continue; }
-                    PrepareHTTPClient(server);
-                    if (_client is null) { throw new Exception(); }
-
-                    var clearURI = new Uri(server.URL + "PackageClear");
-                    var addURI = new Uri(server.URL + "AddPackage");
-
-                    var clearReq = await _client.PostAsync(clearURI, new ByteArrayContent(Array.Empty<byte>()));
-                    if (clearReq.IsSuccessStatusCode is false) { Debug.Log("Package Clear filed!"); continue; }
-                    Debug.Log("Package Clear");
-
-                    var task = Directory.GetDirectories("Packages")
-                        .Where(p => ignorePackage.Any(i => p.Substring(packagesPathStringLen) == i) is false)
-                        .Select(
-                        async package =>
-                        {
-                            var cpID = Progress.Start("Sync " + package, "", Progress.Options.None, pID);
-                            using var memStream = new MemoryStream();
-
-                            using (var zip = new ZipArchive(memStream, ZipArchiveMode.Create))
-                            {
-                                var files = Directory.GetFiles(package, "*", SearchOption.AllDirectories);
-                                for (var i = 0; files.Length > i; i += 1)
-                                {
-                                    Progress.Report(cpID, i / (float)files.Length);
-                                    var f = files[i];
-
-                                    try
-                                    {
-                                        var entry = zip.CreateEntry(f.Substring(packagesPathStringLen), System.IO.Compression.CompressionLevel.Optimal);
-                                        using var entryWriter = entry.Open();
-                                        using var fo = File.OpenRead(f);
-                                        await fo.CopyToAsync(entryWriter);
-                                    }
-                                    catch (Exception e) { Debug.LogWarning(e); }// 握りつぶそうね ... ! めんどいから
-                                }
-                            }
-                            Progress.Finish(cpID);
-                            return memStream.ToArray();
-                        }
-                    );
-                    var postCandidate = await Task.WhenAll(task);
-                    for (var i = 0; postCandidate.Length > i; i += 1)
-                    {
-                        Progress.Report(pID, i / (float)postCandidate.Length);
-                        var packageZip = postCandidate[i];
-                        using var content = new ByteArrayContent(packageZip);
-                        var addReq = await _client.PostAsync(addURI, content);
-                        if (addReq.IsSuccessStatusCode is false) { Debug.Log("Add failed"); continue; }
-                    }
-                }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
-                    Progress.Finish(pID, Progress.Status.Failed);
-                    pID = -1;
-                }
-                finally
-                {
-                    Progress.Finish(pID);
-                    Debug.Log("Sync exit");
-                }
-            }
         }
     }
 }
