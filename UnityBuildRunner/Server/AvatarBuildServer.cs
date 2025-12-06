@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEditor;
@@ -14,6 +15,12 @@ using VRC.SDKBase.Editor.Api;
 
 namespace net.rs64.VRCAvatarBuildServerTool.Server
 {
+    [Serializable]
+    public class RunnerRequest
+    {
+        public string ParentServerURL = "";
+        public string TargetGUID = "";
+    }
     public static class AvatarBuildServer
     {
         [InitializeOnLoadMethod]
@@ -24,7 +31,11 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
 
             try
             {
-                var guid = File.ReadAllText(buildTargetGUIDFilePath);
+                var runReq = JsonUtility.FromJson<RunnerRequest>(File.ReadAllText(buildTargetGUIDFilePath));
+
+                WatchParentServerTask = Task.Run(async () => await WatchParentServer(runReq.ParentServerURL));
+
+                var guid = runReq.TargetGUID;
 
                 var sdk = default(IVRCSdkAvatarBuilderApi);
 
@@ -52,7 +63,25 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             }
         }
 
+        private static async Task WatchParentServer(string parentServerURL)
+        {
+            var httpClient = new HttpClient();
+            var url = new Uri(parentServerURL + "Ping");
+            while (true)
+            {
+                await Task.Delay(100);
+                try
+                {
+                    var res = await httpClient.GetAsync(url);
+                    if (res.IsSuccessStatusCode) { continue; }
+                    else { System.Diagnostics.Process.GetCurrentProcess().Kill(); }
+                }
+                catch { System.Diagnostics.Process.GetCurrentProcess().Kill(); }
+            }
+        }
+
         const string TemporaryThumbnailGUID = "bf34225cf0fe6be64b94e281fb3a55ce";
+        internal static Task WatchParentServerTask;
 
         private static async Task BuildToUploadFromGUID(IVRCSdkAvatarBuilderApi sdk, string guid)
         {

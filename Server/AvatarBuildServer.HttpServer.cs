@@ -42,7 +42,13 @@ public partial class AvatarBuildServer
         var req = ctx.Request;
 
         // 返す code はもう少し何とかするべきではあると思う
-        if (req.Headers.Get("Authorization") != _config.ServerPasscodeHeader) { Console.WriteLine("Authorization failed"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
+        if (req.Headers.Get("Authorization") != _config.ServerPasscodeHeader)
+        {
+            var path = req?.Url?.AbsolutePath ?? ""; // ここ ランナー が死活監視するために穴を開ける。
+            if (path == "/Ping") { ctx.Response.StatusCode = 200; ctx.Response.Close(); return; }
+
+            Console.WriteLine("Authorization failed"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return;
+        }
         if (req.Url is null) { Console.WriteLine("URI not found"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
         if (req.HttpMethod != "POST") { Console.WriteLine("Unknown Request"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }
         if (req.InputStream is null) { Console.WriteLine("POST data is not found"); ctx.Response.StatusCode = 400; ctx.Response.Close(); return; }

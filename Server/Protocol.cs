@@ -37,3 +37,9 @@ public class BuildRequestResponse
     public const string BuildRequestAccept = "BuildRequestAccept";
 }
 
+
+public class RunnerRequest
+{
+    public string ParentServerURL { get; set; } = "";
+    public string TargetGUID { get; set; } = "";
+}
