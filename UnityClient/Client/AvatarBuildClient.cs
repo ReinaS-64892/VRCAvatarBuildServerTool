@@ -90,12 +90,16 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                             {
                                 Progress.Report(doID, 0.7f, "Post data prepare");
                                 var sw = Stopwatch.StartNew();
-                                var buildRequests = await Task.WhenAll(targetNameAndPaths.Select(t => Task.Run(async () => await CreateBuildRequest(t.name, t.Item2))));
+                                var requests = new List<BuildRequest>();
+                                foreach (var targetNP in targetNameAndPaths)
+                                {
+                                    requests.Add(await CreateBuildRequest(targetNP.name, targetNP.Item2));
+                                }
                                 sw.Stop();
                                 Progress.Report(doID, 0.8f, "Encode Assets");
                                 Debug.Log("Find assets:" + sw.ElapsedMilliseconds + "ms");
                                 sw.Restart();
-                                foreach (var buildRequest in buildRequests)
+                                foreach (var buildRequest in requests)
                                 {
                                     await Task.Run(() => SendBuild(buildRequest));
                                 }
