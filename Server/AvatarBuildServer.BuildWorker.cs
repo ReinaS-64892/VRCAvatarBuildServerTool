@@ -68,10 +68,18 @@ public partial class AvatarBuildServer
             var runnerReq = new RunnerRequest() { ParentServerURL = config.ListenAddress.First(), TargetGUID = buildRequest.BuildTarget };
             File.WriteAllText(Path.Combine(projectPath, "BuildTask"), JsonSerializer.Serialize(runnerReq));
 
+            var buildTargetArgumentString = buildRequest.TargetPlatform switch
+            {
+                BuildTargetPlatform.Windows => "win",
+                BuildTargetPlatform.Android => "android",
+                BuildTargetPlatform.IOS => "ios",
+                _ => "win",
+            };
+
             _process = Process.Start(new ProcessStartInfo(
                 config.UnityEditor,
                 $"""
-                -projectPath "{projectPath}" -batchmode -logFile {logoutPath}
+                -projectPath "{projectPath}" -batchmode -logFile {logoutPath} -buildTarget {buildTargetArgumentString}
                 """
             )
             {

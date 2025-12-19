@@ -13,6 +13,7 @@ public class BuildRequest
 {
     public string PrefabName { get; set; } = "";
     public string BuildTarget { get; set; } = "";
+    public BuildTargetPlatform TargetPlatform { get; set; } = BuildTargetPlatform.Windows;
 
     public List<PathToHash> Assets { get; set; } = new();
     public List<Package> Packages { get; set; } = new();
@@ -26,6 +27,12 @@ public class Package
 {
     public string PackageID { get; set; } = "";
     public List<PathToHash> Files { get; set; } = new();
+}
+public enum BuildTargetPlatform
+{
+    Windows = 0,
+    Android = 1,
+    IOS = 2,
 }
 public class BuildRequestResponse
 {
