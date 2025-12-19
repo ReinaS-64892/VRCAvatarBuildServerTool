@@ -85,15 +85,15 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                             var targetAvatarRoots = GetPrefabFromCAU(aus);
 
                             Progress.Report(doID, 0.1f, "CloneAndBuildToAsset");
-                            var targetNameAndPaths = targetAvatarRoots.Select(i => (i.name, CloneAndBuildToAsset(i, clientSideNDMFExecution))).ToArray();
+                            var targetNameAndPathAndPlatforms = targetAvatarRoots.Select(i => (i.prefab.name, CloneAndBuildToAsset(i.prefab, clientSideNDMFExecution), i.target)).ToArray();
                             try
                             {
                                 Progress.Report(doID, 0.7f, "Post data prepare");
                                 var sw = Stopwatch.StartNew();
                                 var requests = new List<BuildRequest>();
-                                foreach (var targetNP in targetNameAndPaths)
+                                foreach (var targetNPP in targetNameAndPathAndPlatforms)
                                 {
-                                    requests.Add(await CreateBuildRequest(targetNP.name, targetNP.Item2));
+                                    requests.Add(await CreateBuildRequest(targetNPP.name, targetNPP.Item2, targetNPP.target));
                                 }
                                 sw.Stop();
                                 Progress.Report(doID, 0.8f, "Encode Assets");
@@ -109,7 +109,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                             }
                             finally
                             {
-                                foreach (var targetPath in targetNameAndPaths) AssetDatabase.DeleteAsset(targetPath.Item2);
+                                foreach (var targetPath in targetNameAndPathAndPlatforms) AssetDatabase.DeleteAsset(targetPath.Item2);
                                 Progress.Report(doID, 1f, "Exit");
                             }
                             Debug.Log("Exit Build transfer");
@@ -126,7 +126,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             }
         }
 
-        public static async Task<BuildRequest> CreateBuildRequest(string prefabName, string prefabPath)
+        public static async Task<BuildRequest> CreateBuildRequest(string prefabName, string prefabPath, BuildTargetPlatform buildTargetPlatform = BuildTargetPlatform.Windows)
         {
             var targetGUID = AssetDatabase.AssetPathToGUID(prefabPath);
             var transferTargetFiles = GetDependenciesWithFiltered(prefabPath).SelectMany(p => new[] { p, p + ".meta" }).ToList();
@@ -134,6 +134,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             var req = new BuildRequest();
             req.PrefabName = prefabName;
             req.BuildTarget = targetGUID;
+            req.TargetPlatform = buildTargetPlatform;
 
             var targetFileHashesKv = await Task.WhenAll(transferTargetFiles.Select(p => Task.Run(async () => new PathToHash() { Path = p, Hash = await GetHash(p) })));
             req.Assets = targetFileHashesKv;
@@ -271,7 +272,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
         }
 
 #if CAU
-        private static List<GameObject> GetPrefabFromCAU(AvatarUploadSettingOrGroup aus, List<GameObject>? avatarRoots = null)
+        private static List<(GameObject prefab, BuildTargetPlatform target)> GetPrefabFromCAU(AvatarUploadSettingOrGroup aus, List<(GameObject, BuildTargetPlatform)>? avatarRoots = null)
         {
             avatarRoots ??= new();
             switch (aus)
@@ -279,16 +280,22 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                 default: break;
                 case AvatarUploadSetting avatarUploadSetting:
                     {
-                        if (avatarUploadSetting.GetCurrentPlatformInfo().enabled is false) { break; }
-                        var avatarRoot = avatarUploadSetting.avatarDescriptor.asset as Component;
-                        if (avatarRoot == null)
+                        void Add(PlatformSpecificInfo info, BuildTargetPlatform platform)
                         {
-                            if (avatarUploadSetting.avatarDescriptor.asset != null)
-                            { Debug.Log("on Scene Prefab is not supported"); }
-                            break;
-                        }
+                            if (info.enabled is false) { return; }
+                            var avatarRoot = avatarUploadSetting.avatarDescriptor.asset as Component;
+                            if (avatarRoot == null)
+                            {
+                                if (avatarUploadSetting.avatarDescriptor.asset != null)
+                                { Debug.Log("on Scene Prefab is not supported"); }
+                                return;
+                            }
 
-                        avatarRoots.Add(avatarRoot.gameObject);
+                            avatarRoots.Add((avatarRoot.gameObject, platform));
+                        }
+                        Add(avatarUploadSetting.windows, BuildTargetPlatform.Windows);
+                        Add(avatarUploadSetting.quest, BuildTargetPlatform.Android);
+                        Add(avatarUploadSetting.ios, BuildTargetPlatform.IOS);
                         break;
                     }
                 case AvatarUploadSettingGroup group:
@@ -310,6 +317,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             }
             return avatarRoots;
         }
+
 #endif
 
         private static string CloneAndBuildToAsset(GameObject avatarRoot, bool doNDMFManualBake)

@@ -18,6 +18,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
         public string PrefabName = "";
         // Unity の GUID
         public string BuildTarget = "";
+        public BuildTargetPlatform TargetPlatform = BuildTargetPlatform.Windows;
 
         public PathToHash[] Assets = Array.Empty<PathToHash>();
         public Package[] Packages = Array.Empty<Package>();
@@ -35,6 +36,12 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
 
         // パスは package 内の相対にしたいね
         public PathToHash[] Files = Array.Empty<PathToHash>();
+    }
+    public enum BuildTargetPlatform
+    {
+        Windows = 0,
+        Android = 1,
+        IOS = 2,
     }
 
     [Serializable]
