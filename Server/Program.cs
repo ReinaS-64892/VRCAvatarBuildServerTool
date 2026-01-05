@@ -28,6 +28,8 @@ Console.WriteLine("instance path : " + instancePath);
 Console.WriteLine("config path   : " + Path.Combine(instancePath, configFileName));
 Console.WriteLine("---");
 
+AvatarBuildServer.UnityBuildRunnerPath = Path.GetFullPath("../UnityBuildRunner");
+
 Console.WriteLine("VRCAvatarBuildServer run !");
 var abs = new AvatarBuildServer(instancePath);
 await abs.Run();
