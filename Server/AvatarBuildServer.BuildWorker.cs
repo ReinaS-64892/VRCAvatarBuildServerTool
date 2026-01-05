@@ -30,10 +30,16 @@ public partial class AvatarBuildServer
             var packages = Path.Combine(projectPath, "Packages");
             foreach (var package in Directory.EnumerateDirectories(packages))
             {
-                var json = Path.Combine(package, "package.json");
-                if (File.Exists(json) is false) { Directory.Delete(package, true); continue; }
-                using var jsonFile = File.OpenRead(json);
-                var packageID = JsonSerializer.Deserialize<PackageJson>(jsonFile)?.PackageID;
+                var jsonPath = Path.Combine(package, "package.json");
+                if (File.Exists(jsonPath) is false) { Directory.Delete(package, true); continue; }
+
+                static PackageJson? ReadPackageID(string path)
+                {
+                    using var jsonFile = File.OpenRead(path);
+                    return JsonSerializer.Deserialize<PackageJson>(jsonFile);
+                }
+
+                var packageID = ReadPackageID(jsonPath)?.PackageID;
                 if (packageID is null) { Directory.Delete(package, true); continue; }
                 if (config.RetainPackageID.Contains(packageID) is false) { Directory.Delete(package, true); continue; }
 
