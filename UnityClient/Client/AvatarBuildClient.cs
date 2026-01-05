@@ -198,7 +198,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             // SHA1 はスレッドセーフではない
             using var sha = SHA1.Create();
             var hash = sha.ComputeHash(await File.ReadAllBytesAsync(filePath));
-            return Convert.ToBase64String(hash);
+            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
         private static async Task SendBuild(BuildRequest buildRequest)
         {
