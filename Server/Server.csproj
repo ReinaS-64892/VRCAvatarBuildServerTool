@@ -7,4 +7,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+<ItemGroup>
+    <Content Include="../UnityBuildRunner/**" >
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>UnityBuildRunner/%(RecursiveDir)/%(Filename)%(Extension)</Link>
+    </Content>
+</ItemGroup>
 </Project>

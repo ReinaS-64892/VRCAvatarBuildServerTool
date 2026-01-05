@@ -28,7 +28,7 @@ Console.WriteLine("instance path : " + instancePath);
 Console.WriteLine("config path   : " + Path.Combine(instancePath, configFileName));
 Console.WriteLine("---");
 
-AvatarBuildServer.UnityBuildRunnerPath = Path.GetFullPath("../UnityBuildRunner");
+AvatarBuildServer.UnityBuildRunnerPath = Path.Combine(AppContext.BaseDirectory, "UnityBuildRunner");
 
 Console.WriteLine("VRCAvatarBuildServer run !");
 var abs = new AvatarBuildServer(instancePath);
