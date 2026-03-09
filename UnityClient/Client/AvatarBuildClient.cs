@@ -155,9 +155,10 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             var fileURI = new Uri(uri + "File");
 
             var transferBytes = 0L;
-            for (var i = 0; 4 > i; i += 1)//とりあえず safety として 4回
+
+            try
             {
-                try
+                for (var i = 0; 4 > i; i += 1)//とりあえず safety として 4回
                 {
                     var response = await _client.PostAsync(buildURI, buildRequestBinaryContent);
                     if (response.StatusCode is not System.Net.HttpStatusCode.OK) { Debug.LogError("Unknown Error"); break; }
@@ -172,7 +173,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                         case "BuildRequestAccept":
                             {
                                 Debug.Log("BuildRequestAccept!");
-                                goto LoopExit;// 渋い気持ち
+                                return;
                             }
                         case "MissingAssets":
                             {
@@ -191,14 +192,13 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                             }
                     }
                 }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
-                }
-
-
-            LoopExit:
-
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+            finally
+            {
                 Debug.Log("file transferer size for:" + transferBytes / (1024.0 * 1024.0) + "mb");
             }
         }
