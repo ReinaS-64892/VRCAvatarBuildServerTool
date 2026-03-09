@@ -56,8 +56,8 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                 AssetDatabase.SetLabels(gameObject, label);
             }
         }
-        [MenuItem("Assets/VRCAvatarBuildServerTool/Others/Add-BuildTarget-Moblie-Label")]
-        public static void AddLabelWithMoblie()
+        [MenuItem("Assets/VRCAvatarBuildServerTool/Others/Add-BuildTarget-Mobile-Label")]
+        public static void AddLabelWithMobile()
         {
             foreach (var a in Selection.objects)
             {
