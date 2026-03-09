@@ -80,17 +80,17 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                 Progress.Report(doID, 0.7f, "Post data prepare");
                 var sw = Stopwatch.StartNew();
 
-                var ingorePackageID = (ignorePackageIDs ?? Enumerable.Empty<string>())
+                var ignorePackageID = (ignorePackageIDs ?? Enumerable.Empty<string>())
                     .Append("net.rs64.vrc-avatar-build-server-tool.unity-client")
                     .Append("net.rs64.vrc-avatar-build-server-tool.unity-build-runner")
                     .ToList();
 
-                var packagesHash = await GetCorectingPackageToHash(ingorePackageID);
+                var packagesHash = await GetCorrectingPackageToHash(ignorePackageID);
 
-                var requests = await Task.WhenAll(targetNameAndPathAndPlatforms.Select(CreateReqest));
-                async Task<BuildRequest> CreateReqest(BuildTargetClonedPrefabRecord t)
+                var requests = await Task.WhenAll(targetNameAndPathAndPlatforms.Select(CreateRequest));
+                async Task<BuildRequest> CreateRequest(BuildTargetClonedPrefabRecord t)
                 {
-                    var targetFileHashesKv = await FindingDenendencyPathToHash(t.PrefabPath);
+                    var targetFileHashesKv = await FindingDependencyPathToHash(t.PrefabPath);
 
                     var targetGUID = AssetDatabase.AssetPathToGUID(t.PrefabPath);
                     var req = new BuildRequest

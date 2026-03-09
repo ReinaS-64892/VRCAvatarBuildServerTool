@@ -16,7 +16,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
         {
             public string name = "";
         }
-        private static async Task<Package[]> GetCorectingPackageToHash(List<string> ingorePackageID)
+        private static async Task<Package[]> GetCorrectingPackageToHash(List<string> ingorePackageID)
         {
             if (PackageCache is null)
             {
@@ -41,7 +41,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                     var fileTask = Directory.GetFiles(pkg, "*", SearchOption.AllDirectories)
                         .Select(p =>
                         {
-                            // exsample p "Packages/TexTransTool/package.json"
+                            // example p "Packages/TexTransTool/package.json"
                             return Task.Run(async () =>
                             {
                                 if (p.Contains("/.git/")) { return null; }// .git は特別に無視します。

@@ -20,7 +20,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             .Where(path => path.StartsWith("Packages") is false || path.StartsWith("Packages/nadena.dev.ndmf/__Generated"))
             .ToArray();
         }
-        private static async Task<PathToHash[]> FindingDenendencyPathToHash(string prefabPath)
+        private static async Task<PathToHash[]> FindingDependencyPathToHash(string prefabPath)
         {
             var transferTargetFiles = GetDependenciesWithFiltered(prefabPath).SelectMany(p => new[] { p, p + ".meta" }).ToList();
             var targetFileHashesKv = await Task.WhenAll(transferTargetFiles.Select(p => Task.Run(async () => new PathToHash() { Path = p, Hash = await GetHash(p) })));
