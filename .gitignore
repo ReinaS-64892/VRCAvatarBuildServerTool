@@ -1,0 +1,4 @@
+ServerInstance
+**/obj
+**/bin
+.vscode

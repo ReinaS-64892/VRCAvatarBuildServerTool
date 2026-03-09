@@ -1,12 +1,11 @@
 {
-    "name": "net.rs64.vrc-avatar-build-server-tool.server",
+    "name": "net.rs64.vrc-avatar-build-server-tool.unity-build-runner",
     "rootNamespace": "",
     "references": [
         "VRC.SDKBase",
         "VRC.SDKBase.Editor",
         "VRC.SDK3A.Editor",
-        "VRC.SDK3A",
-        "net.rs64.vrc-avatar-build-server-tool.transfer"
+        "VRC.SDK3A"
     ],
     "includePlatforms": [
         "Editor"
@@ -22,7 +21,7 @@
     "versionDefines": [
         {
             "name": "com.vrchat.avatars",
-            "expression": "3.9.0-beta.1",
+            "expression": "3.9.0",
             "define": "VRCSDK_AVATAR"
         }
     ],

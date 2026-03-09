@@ -21,31 +21,29 @@ namespace net.rs64.VRCAvatarBuildServerTool.Server
             return SHA1.Create();
         }
 
-        public bool HasFile(string hashBase64)
+        public bool HasFile(string hash)
         {
-            var path = Path.Combine(_directory, EscapeFileName(hashBase64));
-            var exist = File.Exists(path);
-            return exist;
+            return File.Exists(GetPath(hash));
         }
-        public string GetFilePath(string hashBase64)
+        public string GetFilePath(string hash)
         {
-            if (HasFile(hashBase64) is false) { throw new FileNotFoundException(hashBase64); }
-            return Path.Combine(_directory, EscapeFileName(hashBase64));
+            if (HasFile(hash) is false) { throw new FileNotFoundException(hash); }
+            return GetPath(hash);
         }
         public void AddFile(byte[] file)
         {
             var hash = GetSha().ComputeHash(file);
-            var hashBase64 = Convert.ToBase64String(hash);
+            var hashString = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
 
-            var filePath = Path.Combine(_directory, EscapeFileName(hashBase64));
+            var filePath = GetPath(hashString);
 
             if (File.Exists(filePath)) { return; }
             File.WriteAllBytes(filePath, file);
         }
 
-        string EscapeFileName(string name)
+        private string GetPath(string hash)
         {
-            return name.Replace("/", "\\");
+            return Path.Combine(_directory, hash);
         }
 
         public Task<byte[]> GetFile(string hash)

@@ -3,7 +3,6 @@
   "rootNamespace": "",
   "references": [
     "nadena.dev.ndmf",
-    "net.rs64.vrc-avatar-build-server-tool.transfer",
     "com.anatawa12.continuous-avatar-uploader.editor"
   ],
   "includePlatforms": [
