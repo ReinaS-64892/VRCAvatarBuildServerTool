@@ -5,6 +5,8 @@ using UnityEngine;
 using Debug = UnityEngine.Debug;
 
 using Anatawa12.ContinuousAvatarUploader.Editor;
+using UnityEditor;
+using System.Linq;
 
 namespace net.rs64.VRCAvatarBuildServerTool.Client
 {
@@ -54,6 +56,28 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                     }
             }
             return avatarRoots;
+        }
+
+
+
+        [MenuItem("CONTEXT/AvatarUploadSettingGroup/VRCAvatarBuildServerTool/ConvertToLabel")]
+        public static void ConvertToLabel()
+        {
+            var group = Selection.activeObject as AvatarUploadSettingGroup;
+            if (group is null) { return; }
+            var targets = GetPrefabFromCAU(group);
+            foreach (var t in targets)
+            {
+                var label = t.target switch
+                {
+                    BuildTargetPlatform.Windows => LABEL_WINDOWS,
+                    BuildTargetPlatform.Android => LABEL_ANDROID,
+                    BuildTargetPlatform.IOS => LABEL_IOS,
+                    _ => throw new System.Exception(),
+                };
+                var beforeLabels = AssetDatabase.GetLabels(t.prefab);
+                AssetDatabase.SetLabels(t.prefab, beforeLabels.Append(label).Distinct().ToArray());
+            }
         }
     }
 }

@@ -18,15 +18,23 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
     {
         static HttpClient? _client;
 
-        [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer-from-Selection")]
-        [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer")]
-        public static void Do() { DoImpl(); }
+        [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer")]
+        public static void DoAny()
+        {
+            if (Selection.activeObject == null) { DoWithLabel(); }
+            else { DoWithSelection(); }
+        }
 
-        [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer-from-Selection (ClientSideNDMFExecution)")]
-        [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer (ClientSideNDMFExecution)")]
-        public static void ClientSideNDMFManualBakeToDo() { DoImpl(true); }
 
-        public static async void DoImpl(bool clientSideNDMFExecution = false)
+        [MenuItem("Assets/VRCAvatarBuildServerTool/Others/BuildToServer-from-Selection")]
+        [MenuItem("GameObject/VRCAvatarBuildServerTool/Others/BuildToServer-from-Selection")]
+        public static void Do() { DoWithSelection(); }
+
+        [MenuItem("Assets/VRCAvatarBuildServerTool/Others/BuildToServer-from-Selection (ClientSideNDMFExecution)")]
+        [MenuItem("GameObject/VRCAvatarBuildServerTool/Others/BuildToServer-from-Selection (ClientSideNDMFExecution)")]
+        public static void ClientSideNDMFManualBakeToDo() { DoWithSelection(true); }
+
+        public static async void DoWithSelection(bool clientSideNDMFExecution = false)
         {
             await DoSendImpl(Selection.objects.SelectMany(Correcting).ToArray(), clientSideNDMFExecution);
 
