@@ -21,12 +21,15 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
         [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer")]
         public static void DoAny()
         {
-            if (Selection.activeObject == null) { DoWithLabel(); }
+            var doLabel = Selection.objects.Any() is false;
+            doLabel |= Selection.objects.Length is 1 && Selection.objects.First() is UnityEditor.DefaultAsset;
+            if (doLabel) { DoWithLabel(); }
             else { DoWithSelection(); }
         }
 
 
         [MenuItem("Assets/VRCAvatarBuildServerTool/Others/BuildToServer-from-Selection")]
+        [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer")]
         [MenuItem("GameObject/VRCAvatarBuildServerTool/Others/BuildToServer-from-Selection")]
         public static void Do() { DoWithSelection(); }
 
