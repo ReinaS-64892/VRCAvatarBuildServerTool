@@ -18,48 +18,57 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
     {
         static HttpClient? _client;
 
-        [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer")]
+        [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer-from-Selection")]
         [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer")]
         public static void Do() { DoImpl(); }
 
-        [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer(ClientSideNDMFExecution)")]
-        [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer(ClientSideNDMFExecution)")]
+        [MenuItem("Assets/VRCAvatarBuildServerTool/BuildToServer-from-Selection (ClientSideNDMFExecution)")]
+        [MenuItem("GameObject/VRCAvatarBuildServerTool/BuildToServer (ClientSideNDMFExecution)")]
         public static void ClientSideNDMFManualBakeToDo() { DoImpl(true); }
 
         public static async void DoImpl(bool clientSideNDMFExecution = false)
         {
-            switch (Selection.activeObject)
+            await DoSendImpl(Selection.objects.SelectMany(Correcting).ToArray(), clientSideNDMFExecution);
+
+            IEnumerable<BuildTargetRecord> Correcting(UnityEngine.Object o)
             {
-                default: { Debug.Log("Unknown Target"); return; }
-                case GameObject gameObject:
-                    {
-                        var avatarRoot = gameObject;
-                        // VRCSDK の参照するのをサボっている。
-                        if (avatarRoot.GetComponent<Animator>() == null) { return; }
+                switch (o)
+                {
+                    default: { Debug.Log("Unknown Target"); break; }
+                    case GameObject gameObject:
+                        {
+                            var avatarRoot = gameObject;
+                            // VRCSDK の参照するのをサボっている。
+                            if (avatarRoot.GetComponent<Animator>() == null) { break; }
 
-                        await DoSendImpl(
-                            new List<BuildTargetRecord>()
+                            var platform = EditorUserBuildSettings.selectedBuildTargetGroup switch
                             {
-                                new(avatarRoot, BuildTargetPlatform.Windows)
-                            },
-                            clientSideNDMFExecution
-                        );
-                        break;
-                    }
-#if CAU
-                case Anatawa12.ContinuousAvatarUploader.Editor.AvatarUploadSettingOrGroup aus:
-                    {
-                        var targetAvatarRoots = GetPrefabFromCAU(aus);
+                                BuildTargetGroup.Standalone => BuildTargetPlatform.Windows,
+                                BuildTargetGroup.Android => BuildTargetPlatform.Android,
+                                BuildTargetGroup.iOS => BuildTargetPlatform.IOS,
+                                _ => throw new NotImplementedException(),
+                            };
 
-                        await DoSendImpl(targetAvatarRoots, clientSideNDMFExecution);
-                        break;
-                    }
+                            yield return new(avatarRoot, platform);
+                            break;
+                        }
+#if CAU
+                    case Anatawa12.ContinuousAvatarUploader.Editor.AvatarUploadSettingOrGroup aus:
+                        {
+                            foreach (var t in GetPrefabFromCAU(aus))
+                                yield return t;
+
+                            break;
+                        }
 #endif
+                }
             }
         }
 
         static async Task DoSendImpl(IEnumerable<BuildTargetRecord> buildTargetRecords, bool clientSideNDMFExecution = false)
         {
+            if (buildTargetRecords.Any() is false) { Debug.Log("target not found"); return; }
+
             var targetServer = AvatarBuildClientConfiguration.instance.BuildServers.FirstOrDefault();
             var ignorePackageIDs = AvatarBuildClientConfiguration.instance.IgnorePackageIDs;
 
