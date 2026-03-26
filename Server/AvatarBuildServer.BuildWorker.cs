@@ -85,7 +85,7 @@ public partial class AvatarBuildServer
             _process = Process.Start(new ProcessStartInfo(
                 config.UnityEditor,
                 $"""
-                -projectPath "{projectPath}" -batchmode -logFile {logoutPath} -buildTarget {buildTargetArgumentString}
+                -projectPath "{projectPath}" -batchmode -logFile {logoutPath} -buildTarget {buildTargetArgumentString} {string.Join(" ", config.LaunchArguments)}
                 """
             )
             {

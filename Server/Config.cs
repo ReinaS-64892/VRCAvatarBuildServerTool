@@ -10,4 +10,6 @@ public class Config
 
     public string TemplateProject { get; set; } = "";
     public List<string> RetainPackageID { get; set; } = [];
+
+    public List<string> LaunchArguments  { get; set;} = [];
 }
