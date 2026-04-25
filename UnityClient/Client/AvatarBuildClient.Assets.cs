@@ -44,6 +44,9 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             var targetPath = AssetDatabase.GenerateUniqueAssetPath("Assets/" + builded.name + ".prefab");
             PrefabUtility.SaveAsPrefabAsset(builded, targetPath);
             UnityEngine.Object.DestroyImmediate(builded);
+
+            UnityForwardCompatibilityBreakingFix(targetPath);
+
             return targetPath;
         }
 
@@ -56,5 +59,58 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
             }
             catch (Exception e) { Debug.LogException(e); }
         }
+
+
+        private static void UnityForwardCompatibilityBreakingFix(string prefabPath)
+        {
+#if UNITY_6000_4_OR_NEWER
+
+            // 少なくとも Unity 6.4 では、 AudioSource の m_audioClip が m_Resource に移動したので、それを書き戻すパッチを当てる
+            //AudioSource:
+            //  m_audioClip: {fileID: 0}
+            //  m_Resource: {fileID: 8300000, guid: eb14eab34389d79728894b2d6a4bf289, type: 3}
+
+            var patchedPath = prefabPath + ".patched";
+            {
+                using var prefabStream = File.OpenText(prefabPath);
+                using var patched = File.CreateText(patchedPath);
+                while (prefabStream.EndOfStream is false)
+                {
+                    var line = prefabStream.ReadLine();
+                    patched.WriteLine(line);
+                    if (line is not "AudioSource:") { continue; }
+
+                    while (true)
+                    {
+                        var audioSourcePropertyLine = prefabStream.ReadLine();
+
+                        if (audioSourcePropertyLine.StartsWith("  m_Resource:"))
+                        {
+                            patched.WriteLine(audioSourcePropertyLine);
+                            patched.WriteLine(audioSourcePropertyLine.Replace("  m_Resource:", "  m_audioClip:"));
+                        }
+                        else if (audioSourcePropertyLine.StartsWith("  m_audioClip:"))
+                        {
+                            // ignore
+                        }
+                        else if (audioSourcePropertyLine.StartsWith("--- "))
+                        {
+                            patched.WriteLine(audioSourcePropertyLine);
+                            break;
+                        }
+                        else
+                        {
+                            patched.WriteLine(audioSourcePropertyLine);
+                        }
+
+                    }
+                }
+            }
+            // File.Copy(prefabPath, prefabPath + ".origin", true);
+            File.Copy(patchedPath, prefabPath, true);
+            File.Delete(patchedPath);
+#endif
+        }
+
     }
 }
