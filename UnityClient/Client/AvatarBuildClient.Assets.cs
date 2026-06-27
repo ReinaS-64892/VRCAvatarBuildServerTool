@@ -63,9 +63,10 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
 
         private static void UnityForwardCompatibilityBreakingFix(string prefabPath)
         {
-#if UNITY_6000_4_OR_NEWER
+#if UNITY_6000_0_OR_NEWER
 
             // 少なくとも Unity 6.4 では、 AudioSource の m_audioClip が m_Resource に移動したので、それを書き戻すパッチを当てる
+            // 追記 : Unity 6.0 でなってた
             //AudioSource:
             //  m_audioClip: {fileID: 0}
             //  m_Resource: {fileID: 8300000, guid: eb14eab34389d79728894b2d6a4bf289, type: 3}
