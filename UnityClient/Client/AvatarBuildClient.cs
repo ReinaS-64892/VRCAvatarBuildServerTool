@@ -52,6 +52,38 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                             // VRCSDK の参照するのをサボっている。
                             if (avatarRoot.GetComponent<Animator>() == null) { break; }
 
+                            if (AssetDatabase.Contains(avatarRoot))
+                            {
+                                var labels = AssetDatabase.GetLabels(avatarRoot);
+                                var hasLabel = labels.Any(l => l switch { LABEL_WINDOWS => true, LABEL_IOS => true, LABEL_ANDROID => true, _ => false });
+                                if (hasLabel)
+                                {
+                                    foreach (var l in labels)
+                                    {
+                                        switch (l)
+                                        {
+                                            default: continue;
+                                            case LABEL_WINDOWS:
+                                                {
+                                                    yield return new(avatarRoot, BuildTargetPlatform.Windows);
+                                                    break;
+                                                }
+                                            case LABEL_ANDROID:
+                                                {
+                                                    yield return new(avatarRoot, BuildTargetPlatform.Android);
+                                                    break;
+                                                }
+                                            case LABEL_IOS:
+                                                {
+                                                    yield return new(avatarRoot, BuildTargetPlatform.IOS);
+                                                    break;
+                                                }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+
                             var platform = EditorUserBuildSettings.selectedBuildTargetGroup switch
                             {
                                 BuildTargetGroup.Standalone => BuildTargetPlatform.Windows,
@@ -63,7 +95,7 @@ namespace net.rs64.VRCAvatarBuildServerTool.Client
                             yield return new(avatarRoot, platform);
                             break;
                         }
-#if CAU
+#if CAU && VRCSDK_BASE_3_6_0
                     case Anatawa12.ContinuousAvatarUploader.Editor.AvatarUploadSettingOrGroup aus:
                         {
                             foreach (var t in GetPrefabFromCAU(aus))
