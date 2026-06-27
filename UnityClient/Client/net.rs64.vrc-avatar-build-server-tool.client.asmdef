@@ -24,6 +24,11 @@
       "name": "com.anatawa12.continuous-avatar-uploader",
       "expression": "0.3.3",
       "define": "CAU"
+    },
+    {
+      "name": "com.vrchat.base",
+      "expression": "3.6.0",
+      "define": "VRCSDK_BASE_3_6_0"
     }
   ],
   "noEngineReferences": false

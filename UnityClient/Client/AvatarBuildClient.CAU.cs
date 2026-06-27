@@ -1,5 +1,5 @@
 #nullable enable
-#if CAU
+#if CAU && VRCSDK_BASE_3_6_0
 using System.Collections.Generic;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
